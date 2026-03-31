@@ -69,26 +69,28 @@ final class RepositorioLibros
                 INNER JOIN usuarios u ON u.id = l.id_usuario
                 LEFT JOIN prestamos p ON p.id_libro = l.id AND p.fecha_devolucion IS NULL
                 WHERE l.activo_intercambio = 1
-                  AND p.id IS NULL
-                  AND (:termino = "" OR l.titulo LIKE :termino_like OR l.autor LIKE :termino_like)
-                  AND (:genero = "" OR l.genero = :genero)';
+                  AND p.id IS NULL';
+
+        $parametros = [];
+
+        if ($terminoBusqueda !== '') {
+            $sql .= ' AND (l.titulo LIKE :termino_titulo OR l.autor LIKE :termino_autor)';
+            $parametros['termino_titulo'] = $terminoLike;
+            $parametros['termino_autor'] = $terminoLike;
+        }
+
+        if ($genero !== '') {
+            $sql .= ' AND l.genero = :genero';
+            $parametros['genero'] = $genero;
+        }
 
         if ($idUsuarioActual !== null) {
             $sql .= ' AND l.id_usuario <> :id_usuario_actual';
+            $parametros['id_usuario_actual'] = $idUsuarioActual;
         }
 
         $sql .= ' ORDER BY l.fecha_publicacion DESC';
         $sentencia = $this->conexion->prepare($sql);
-
-        $parametros = [
-            'termino' => $terminoBusqueda,
-            'termino_like' => $terminoLike,
-            'genero' => $genero,
-        ];
-
-        if ($idUsuarioActual !== null) {
-            $parametros['id_usuario_actual'] = $idUsuarioActual;
-        }
 
         $sentencia->execute($parametros);
         return $sentencia->fetchAll();
