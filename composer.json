@@ -1,0 +1,15 @@
+{
+  "name": "fabularia/intercambio-libros",
+  "description": "Proyecto de intercambio de libros entre usuarios con API REST en PHP.",
+  "type": "project",
+  "require": {
+    "php": "^8.1",
+    "vlucas/phpdotenv": "^5.6",
+    "monolog/monolog": "^3.6"
+  },
+  "autoload": {
+    "psr-4": {
+      "Fabularia\\": "src/"
+    }
+  }
+}
