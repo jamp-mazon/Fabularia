@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 use Fabularia\Controladores\ControladorLibros;
 use Fabularia\Controladores\ControladorPrestamos;
+use Fabularia\Controladores\ControladorTelegram;
 use Fabularia\Controladores\ControladorUsuarios;
 use Fabularia\Http\Enrutador;
 use Fabularia\Http\RespuestaJson;
 use Fabularia\Repositorios\RepositorioLibros;
 use Fabularia\Repositorios\RepositorioPrestamos;
 use Fabularia\Repositorios\RepositorioUsuarios;
+use Fabularia\Servicios\ServicioWebhookPrestamos;
 
 $contenedor = require __DIR__ . '/../config/bootstrap.php';
 $pdo = $contenedor['pdo'];
@@ -18,10 +20,25 @@ $logger = $contenedor['logger'];
 $repositorioUsuarios = new RepositorioUsuarios($pdo);
 $repositorioLibros = new RepositorioLibros($pdo);
 $repositorioPrestamos = new RepositorioPrestamos($pdo);
+$servicioWebhookPrestamos = new ServicioWebhookPrestamos(
+    $logger,
+    (string) ($_ENV['N8N_WEBHOOK_PRESTAMO'] ?? 'https://n8n.example/webhook-test/REDACTED')
+);
 
 $controladorUsuarios = new ControladorUsuarios($repositorioUsuarios, $logger);
 $controladorLibros = new ControladorLibros($repositorioLibros, $logger);
-$controladorPrestamos = new ControladorPrestamos($repositorioPrestamos, $repositorioLibros, $logger);
+$controladorTelegram = new ControladorTelegram(
+    $repositorioUsuarios,
+    $logger,
+    (string) ($_ENV['TELEGRAM_VINCULACION_TOKEN'] ?? '')
+);
+$controladorPrestamos = new ControladorPrestamos(
+    $repositorioPrestamos,
+    $repositorioLibros,
+    $repositorioUsuarios,
+    $servicioWebhookPrestamos,
+    $logger
+);
 
 /**
  * Normaliza la ruta teniendo en cuenta que en Apache/XAMPP puede existir un prefijo
@@ -71,6 +88,7 @@ $enrutador->registrar('POST', '/api/usuarios/registro', static fn () => $control
 $enrutador->registrar('POST', '/api/usuarios/login', static fn () => $controladorUsuarios->iniciarSesion());
 $enrutador->registrar('POST', '/api/usuarios/logout', static fn () => $controladorUsuarios->cerrarSesion(), true);
 $enrutador->registrar('GET', '/api/usuarios/yo', static fn () => $controladorUsuarios->usuarioActual());
+$enrutador->registrar('POST', '/api/telegram/vincular', static fn () => $controladorTelegram->vincularCuenta());
 
 $enrutador->registrar('POST', '/api/libros', static fn () => $controladorLibros->publicarLibro(), true);
 $enrutador->registrar('GET', '/api/libros', static fn () => $controladorLibros->listarDisponibles(), true);

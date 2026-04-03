@@ -7,6 +7,7 @@ if ($basePublica === '.' || $basePublica === '') {
     $basePublica = '';
 }
 $urlBaseApi = $basePublica . '/api';
+$urlBaseTelegramBot = (string) ($_ENV['TELEGRAM_BOT_URL_BASE'] ?? 'https://t.me/Fabularia_bot?start=');
 ?>
 <!doctype html>
 <html lang="es">
@@ -64,6 +65,7 @@ $urlBaseApi = $basePublica . '/api';
             border: 1px solid #cbd5e1;
             font: inherit;
         }
+        input[type="checkbox"] { width: auto; }
         textarea { min-height: 90px; resize: vertical; }
         button {
             border: 0;
@@ -125,6 +127,12 @@ $urlBaseApi = $basePublica . '/api';
             font-size: 0.88rem;
             color: #475569;
         }
+        .fila-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0.7rem 0;
+        }
     </style>
 </head>
 <body>
@@ -147,20 +155,32 @@ $urlBaseApi = $basePublica . '/api';
                 <label for="registroEmail">Email</label>
                 <input id="registroEmail" name="email" type="email" required>
 
-                <label for="registroContrasena">Contraseña</label>
+                <label for="registroTelefono">Telefono (opcional)</label>
+                <input id="registroTelefono" name="telefono" type="text" placeholder="+34 600 000 000">
+
+                <label for="registroContrasena">Contrasena</label>
                 <input id="registroContrasena" name="contrasena" type="password" required>
+
+                <label class="fila-checkbox">
+                    <input id="registroVincularTelegram" name="vincular_telegram" type="checkbox">
+                    <span>Quiero vincular mi cuenta de Telegram</span>
+                </label>
 
                 <button type="submit">Crear cuenta</button>
             </form>
+            <p id="textoTelegramRegistro" class="pequeno" style="display:none;">
+                Vincula tu Telegram aqui:
+                <a id="enlaceTelegramRegistro" href="#" target="_blank" rel="noopener noreferrer">Abrir bot</a>
+            </p>
         </article>
 
         <article class="tarjeta">
-            <h2>Iniciar Sesión</h2>
+            <h2>Iniciar Sesion</h2>
             <form id="formularioLogin">
                 <label for="loginEmail">Email</label>
                 <input id="loginEmail" name="email" type="email" required>
 
-                <label for="loginContrasena">Contraseña</label>
+                <label for="loginContrasena">Contrasena</label>
                 <input id="loginContrasena" name="contrasena" type="password" required>
 
                 <button type="submit">Entrar</button>
@@ -173,11 +193,15 @@ $urlBaseApi = $basePublica . '/api';
             <div class="linea-encabezado">
                 <div>
                     <h2>Panel de Usuario</h2>
-                    <p class="pequeno">Sesión activa de: <strong id="nombreUsuarioActivo">-</strong></p>
+                    <p class="pequeno">Sesion activa de: <strong id="nombreUsuarioActivo">-</strong></p>
+                    <p class="pequeno">
+                        Vincular Telegram:
+                        <a id="enlaceTelegramPanel" href="#" target="_blank" rel="noopener noreferrer">Abrir bot</a>
+                    </p>
                 </div>
                 <div class="acciones">
                     <button id="botonRefrescar" type="button" class="secundario">Refrescar datos</button>
-                    <button id="botonCerrarSesion" type="button">Cerrar sesión</button>
+                    <button id="botonCerrarSesion" type="button">Cerrar sesion</button>
                 </div>
             </div>
         </article>
@@ -186,7 +210,7 @@ $urlBaseApi = $basePublica . '/api';
             <article class="tarjeta">
                 <h3>Publicar Libro para Intercambio</h3>
                 <form id="formularioLibro">
-                    <label for="libroTitulo">Título</label>
+                    <label for="libroTitulo">Titulo</label>
                     <input id="libroTitulo" name="titulo" required>
 
                     <label for="libroAutor">Autor</label>
@@ -195,8 +219,8 @@ $urlBaseApi = $basePublica . '/api';
                     <label for="libroGenero">Genero</label>
                     <input id="libroGenero" name="genero" placeholder="Ejemplo: Novela, Fantasia, Ciencia ficcion" required>
 
-                    <label for="libroDescripcion">Descripción</label>
-                    <textarea id="libroDescripcion" name="descripcion" placeholder="Estado, edición, notas..."></textarea>
+                    <label for="libroDescripcion">Descripcion</label>
+                    <textarea id="libroDescripcion" name="descripcion" placeholder="Estado, edicion, notas..."></textarea>
 
                     <button type="submit">Publicar libro</button>
                 </form>
@@ -205,7 +229,7 @@ $urlBaseApi = $basePublica . '/api';
             <article class="tarjeta">
                 <h3>Buscar Libros Disponibles</h3>
                 <form id="formularioBusqueda">
-                    <label for="busquedaTexto">Título o autor</label>
+                    <label for="busquedaTexto">Titulo o autor</label>
                     <input id="busquedaTexto" name="buscar" placeholder="Ejemplo: Borges">
                     <label for="busquedaGenero">Genero</label>
                     <input id="busquedaGenero" name="genero" placeholder="Filtrar por genero">
@@ -223,7 +247,7 @@ $urlBaseApi = $basePublica . '/api';
             </article>
 
             <article class="tarjeta">
-                <h3>Mis Préstamos</h3>
+                <h3>Mis Prestamos</h3>
                 <ul id="listaMisPrestamos" class="lista"></ul>
             </article>
         </div>
@@ -232,10 +256,14 @@ $urlBaseApi = $basePublica . '/api';
 
 <script>
     const URL_BASE_API = <?= json_encode($urlBaseApi, JSON_UNESCAPED_SLASHES) ?>;
+    const URL_BOT_TELEGRAM_BASE = <?= json_encode($urlBaseTelegramBot, JSON_UNESCAPED_SLASHES) ?>;
     const elementoMensaje = document.getElementById("mensaje");
     const seccionAutenticacion = document.getElementById("seccionAutenticacion");
     const seccionAplicacion = document.getElementById("seccionAplicacion");
     const nombreUsuarioActivo = document.getElementById("nombreUsuarioActivo");
+    const enlaceTelegramPanel = document.getElementById("enlaceTelegramPanel");
+    const textoTelegramRegistro = document.getElementById("textoTelegramRegistro");
+    const enlaceTelegramRegistro = document.getElementById("enlaceTelegramRegistro");
 
     function mostrarMensaje(texto, tipo = "ok") {
         elementoMensaje.className = "mensaje " + tipo;
@@ -245,6 +273,10 @@ $urlBaseApi = $basePublica . '/api';
     function limpiarMensaje() {
         elementoMensaje.className = "mensaje";
         elementoMensaje.textContent = "";
+    }
+
+    function construirEnlaceTelegram(idUsuario) {
+        return `${URL_BOT_TELEGRAM_BASE}${idUsuario}`;
     }
 
     async function llamarApi(ruta, metodo = "GET", datos = null) {
@@ -258,7 +290,7 @@ $urlBaseApi = $basePublica . '/api';
         const cuerpo = await respuesta.json().catch(() => ({}));
 
         if (!respuesta.ok) {
-            throw new Error(cuerpo.error || "Se produjo un error en la petición.");
+            throw new Error(cuerpo.error || "Se produjo un error en la peticion.");
         }
 
         return cuerpo;
@@ -281,7 +313,7 @@ $urlBaseApi = $basePublica . '/api';
                 <p class="pequeno">Genero: ${libro.genero}</p>
                 <p class="pequeno">Propietario: ${libro.propietario}</p>
                 ${descripcion}
-                <button type="button" data-id-libro="${libro.id}">Solicitar préstamo</button>
+                <button type="button" data-id-libro="${libro.id}">Solicitar prestamo</button>
             `;
             lista.appendChild(elemento);
         }
@@ -292,7 +324,7 @@ $urlBaseApi = $basePublica . '/api';
         lista.innerHTML = "";
 
         if (!libros.length) {
-            lista.innerHTML = "<li>No has publicado libros todavía.</li>";
+            lista.innerHTML = "<li>No has publicado libros todavia.</li>";
             return;
         }
 
@@ -309,20 +341,20 @@ $urlBaseApi = $basePublica . '/api';
         lista.innerHTML = "";
 
         if (!prestamos.length) {
-            lista.innerHTML = "<li>No tienes préstamos registrados.</li>";
+            lista.innerHTML = "<li>No tienes prestamos registrados.</li>";
             return;
         }
 
         for (const prestamo of prestamos) {
             const activo = prestamo.fecha_devolucion === null;
             const botonDevolver = activo
-                ? `<button type="button" data-id-prestamo="${prestamo.id}">Marcar devolución</button>`
+                ? `<button type="button" data-id-prestamo="${prestamo.id}">Marcar devolucion</button>`
                 : `<span class="pequeno">Devuelto: ${prestamo.fecha_devolucion}</span>`;
 
             const elemento = document.createElement("li");
             elemento.innerHTML = `
                 <strong>${prestamo.titulo}</strong> - ${prestamo.autor}
-                <p class="pequeno">Dueño: ${prestamo.nombre_dueno}</p>
+                <p class="pequeno">Dueno: ${prestamo.nombre_dueno}</p>
                 <p class="pequeno">Prestado: ${prestamo.fecha_prestamo}</p>
                 ${botonDevolver}
             `;
@@ -372,6 +404,7 @@ $urlBaseApi = $basePublica . '/api';
         seccionAutenticacion.style.display = "none";
         seccionAplicacion.style.display = "block";
         nombreUsuarioActivo.textContent = `${datosSesion.usuario.nombre} ${datosSesion.usuario.apellidos}`;
+        enlaceTelegramPanel.href = construirEnlaceTelegram(datosSesion.usuario.id);
         return true;
     }
 
@@ -383,13 +416,23 @@ $urlBaseApi = $basePublica . '/api';
         const datos = {
             nombre: formulario.nombre.value,
             apellidos: formulario.apellidos.value,
+            telefono: formulario.telefono.value.trim(),
             email: formulario.email.value,
             contrasena: formulario.contrasena.value
         };
+        const quiereVincularTelegram = Boolean(formulario.vincular_telegram.checked);
 
         try {
-            await llamarApi("/usuarios/registro", "POST", datos);
-            mostrarMensaje("Registro correcto. Ya tienes sesión iniciada.");
+            const respuesta = await llamarApi("/usuarios/registro", "POST", datos);
+            mostrarMensaje("Registro correcto. Ya tienes sesion iniciada.");
+
+            if (quiereVincularTelegram) {
+                enlaceTelegramRegistro.href = construirEnlaceTelegram(respuesta.usuario.id);
+                textoTelegramRegistro.style.display = "block";
+            } else {
+                textoTelegramRegistro.style.display = "none";
+            }
+
             formulario.reset();
             await actualizarSesion();
             await cargarPanelCompleto();
@@ -410,7 +453,7 @@ $urlBaseApi = $basePublica . '/api';
 
         try {
             await llamarApi("/usuarios/login", "POST", datos);
-            mostrarMensaje("Sesión iniciada correctamente.");
+            mostrarMensaje("Sesion iniciada correctamente.");
             formulario.reset();
             await actualizarSesion();
             await cargarPanelCompleto();
@@ -462,7 +505,7 @@ $urlBaseApi = $basePublica . '/api';
         limpiarMensaje();
         try {
             await llamarApi("/prestamos", "POST", { id_libro: Number(boton.dataset.idLibro) });
-            mostrarMensaje("Préstamo solicitado correctamente.");
+            mostrarMensaje("Prestamo solicitado correctamente.");
             await cargarPanelCompleto();
         } catch (error) {
             mostrarMensaje(error.message, "error");
@@ -478,7 +521,7 @@ $urlBaseApi = $basePublica . '/api';
         limpiarMensaje();
         try {
             await llamarApi("/prestamos/devolver", "POST", { id_prestamo: Number(boton.dataset.idPrestamo) });
-            mostrarMensaje("Préstamo devuelto correctamente.");
+            mostrarMensaje("Prestamo devuelto correctamente.");
             await cargarPanelCompleto();
         } catch (error) {
             mostrarMensaje(error.message, "error");
@@ -489,9 +532,10 @@ $urlBaseApi = $basePublica . '/api';
         limpiarMensaje();
         try {
             await llamarApi("/usuarios/logout", "POST");
-            mostrarMensaje("Sesión cerrada.");
+            mostrarMensaje("Sesion cerrada.");
             seccionAutenticacion.style.display = "grid";
             seccionAplicacion.style.display = "none";
+            textoTelegramRegistro.style.display = "none";
         } catch (error) {
             mostrarMensaje(error.message, "error");
         }

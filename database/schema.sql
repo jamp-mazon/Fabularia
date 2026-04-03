@@ -2,6 +2,9 @@ CREATE TABLE IF NOT EXISTS usuarios (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(120) NOT NULL,
     apellidos VARCHAR(160) NOT NULL,
+    telefono VARCHAR(30) NULL,
+    telegram_chat_id VARCHAR(40) NULL,
+    telegram_usuario VARCHAR(120) NULL,
     email VARCHAR(190) NOT NULL UNIQUE,
     contrasena_hash VARCHAR(255) NOT NULL,
     fecha_registro DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -44,5 +47,6 @@ CREATE TABLE IF NOT EXISTS prestamos (
 CREATE INDEX idx_libros_titulo ON libros(titulo);
 CREATE INDEX idx_libros_autor ON libros(autor);
 CREATE INDEX idx_libros_genero ON libros(genero);
+CREATE UNIQUE INDEX ux_usuarios_telegram_chat_id ON usuarios(telegram_chat_id);
 CREATE INDEX idx_prestamos_libro ON prestamos(id_libro);
 CREATE INDEX idx_prestamos_prestado ON prestamos(id_usuario_prestado);

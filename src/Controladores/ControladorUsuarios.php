@@ -24,6 +24,8 @@ final class ControladorUsuarios
         $datos = SolicitudHttp::obtenerDatosEntrada();
         $nombre = SolicitudHttp::obtenerTexto($datos, 'nombre');
         $apellidos = SolicitudHttp::obtenerTexto($datos, 'apellidos');
+        $telefono = SolicitudHttp::obtenerTexto($datos, 'telefono');
+        $telefono = $telefono === '' ? null : $telefono;
         $email = mb_strtolower(SolicitudHttp::obtenerTexto($datos, 'email'));
         $contrasena = SolicitudHttp::obtenerTexto($datos, 'contrasena');
 
@@ -35,6 +37,10 @@ final class ControladorUsuarios
             return [422, ['error' => 'El email no tiene un formato válido.']];
         }
 
+        if ($telefono !== null && !$this->telefonoValido($telefono)) {
+            return [422, ['error' => 'El telefono no tiene un formato valido.']];
+        }
+
         if (mb_strlen($contrasena) < 6) {
             return [422, ['error' => 'La contraseña debe tener al menos 6 caracteres.']];
         }
@@ -44,7 +50,13 @@ final class ControladorUsuarios
         }
 
         $contrasenaHash = password_hash($contrasena, PASSWORD_DEFAULT);
-        $idUsuario = $this->repositorioUsuarios->crearUsuario($nombre, $apellidos, $email, $contrasenaHash);
+        $idUsuario = $this->repositorioUsuarios->crearUsuario(
+            $nombre,
+            $apellidos,
+            $telefono,
+            $email,
+            $contrasenaHash
+        );
 
         $_SESSION['id_usuario'] = $idUsuario;
         $_SESSION['nombre_usuario'] = trim($nombre . ' ' . $apellidos);
@@ -59,6 +71,9 @@ final class ControladorUsuarios
                     'id' => $idUsuario,
                     'nombre' => $nombre,
                     'apellidos' => $apellidos,
+                    'telefono' => $telefono,
+                    'telegram_chat_id' => null,
+                    'telegram_usuario' => null,
                     'email' => $email,
                 ],
             ],
@@ -96,6 +111,9 @@ final class ControladorUsuarios
                     'id' => (int) $usuario['id'],
                     'nombre' => (string) $usuario['nombre'],
                     'apellidos' => (string) $usuario['apellidos'],
+                    'telefono' => $usuario['telefono'],
+                    'telegram_chat_id' => $usuario['telegram_chat_id'],
+                    'telegram_usuario' => $usuario['telegram_usuario'],
                     'email' => (string) $usuario['email'],
                 ],
             ],
@@ -128,5 +146,10 @@ final class ControladorUsuarios
         }
 
         return [200, ['autenticado' => true, 'usuario' => $usuario]];
+    }
+
+    private function telefonoValido(string $telefono): bool
+    {
+        return preg_match('/^[0-9+()\\-\\s]{6,30}$/', $telefono) === 1;
     }
 }
