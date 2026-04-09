@@ -72,13 +72,58 @@ function normalizarRutaSolicitada(string $rutaSolicitada, string $rutaScript): s
     return '/' . ltrim($rutaNormalizada, '/');
 }
 
+function obtenerBasePublica(string $rutaScript): string
+{
+    $basePublica = rtrim(str_replace('\\', '/', dirname($rutaScript)), '/');
+    if ($basePublica === '' || $basePublica === '.') {
+        return '';
+    }
+
+    return $basePublica;
+}
+
+function redirigir(string $basePublica, string $destinoRelativo): never
+{
+    header('Location: ' . $basePublica . $destinoRelativo);
+    exit;
+}
+
 $metodoHttp = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
 $rutaBruta = (string) (parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/');
 $ruta = normalizarRutaSolicitada($rutaBruta, $_SERVER['SCRIPT_NAME'] ?? '/index.php');
+$basePublica = obtenerBasePublica($_SERVER['SCRIPT_NAME'] ?? '/index.php');
+$urlBaseApi = $basePublica . '/api';
+$urlBaseTelegramBot = (string) ($_ENV['TELEGRAM_BOT_URL_BASE'] ?? 'https://t.me/Fabularia_bot?start=');
+$autenticado = !empty($_SESSION['id_usuario']);
 
-if ($metodoHttp === 'GET' && $ruta === '/') {
-    require __DIR__ . '/vista_inicio.php';
-    exit;
+if ($metodoHttp === 'GET' && !str_starts_with($ruta, '/api/')) {
+    if ($ruta === '/') {
+        redirigir($basePublica, $autenticado ? '/app' : '/login');
+    }
+
+    if ($ruta === '/login') {
+        if ($autenticado) {
+            redirigir($basePublica, '/app');
+        }
+        require __DIR__ . '/vistas/login.php';
+        exit;
+    }
+
+    if ($ruta === '/registro') {
+        if ($autenticado) {
+            redirigir($basePublica, '/app');
+        }
+        require __DIR__ . '/vistas/registro.php';
+        exit;
+    }
+
+    if ($ruta === '/app') {
+        if (!$autenticado) {
+            redirigir($basePublica, '/login');
+        }
+        require __DIR__ . '/vistas/aplicacion.php';
+        exit;
+    }
 }
 
 $enrutador = new Enrutador();

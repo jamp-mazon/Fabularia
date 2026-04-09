@@ -63,6 +63,12 @@ SOURCE database/migracion_telegram_usuarios.sql;
 http://localhost/Fabularia/public/
 ```
 
+Rutas de interfaz:
+
+- `GET /login`
+- `GET /registro`
+- `GET /app`
+
 ## API REST (resumen)
 
 - `POST /api/usuarios/registro`
@@ -111,4 +117,7 @@ Tambien puedes enviar el token en cabecera HTTP `X-Vinculacion-Token`.
 - `database/migracion_telegram_usuarios.sql`: alteracion para anadir `telegram_chat_id` y `telegram_usuario`.
 - `src/`: controladores, repositorios, enrutador y utilidades HTTP.
 - `public/index.php`: front controller de la API y de la vista principal.
-- `public/vista_inicio.php`: formularios para consumir la API.
+- `public/vistas/login.php`: pantalla de acceso.
+- `public/vistas/registro.php`: alta de usuario.
+- `public/vistas/aplicacion.php`: panel principal de la app.
+- `public/assets/`: estilos y JS compartidos de interfaz.
