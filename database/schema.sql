@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS libros (
     titulo VARCHAR(160) NOT NULL,
     autor VARCHAR(160) NOT NULL,
     genero VARCHAR(100) NOT NULL,
+    portada_url VARCHAR(500) NULL,
     descripcion TEXT NULL,
     fecha_publicacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     activo_intercambio TINYINT(1) NOT NULL DEFAULT 1,

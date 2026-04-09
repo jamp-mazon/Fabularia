@@ -17,16 +17,18 @@ final class RepositorioLibros
         string $titulo,
         string $autor,
         string $genero,
+        ?string $portadaUrl,
         ?string $descripcion
     ): int {
-        $sql = 'INSERT INTO libros (id_usuario, titulo, autor, genero, descripcion, activo_intercambio)
-                VALUES (:id_usuario, :titulo, :autor, :genero, :descripcion, 1)';
+        $sql = 'INSERT INTO libros (id_usuario, titulo, autor, genero, portada_url, descripcion, activo_intercambio)
+                VALUES (:id_usuario, :titulo, :autor, :genero, :portada_url, :descripcion, 1)';
         $sentencia = $this->conexion->prepare($sql);
         $sentencia->execute([
             'id_usuario' => $idUsuario,
             'titulo' => $titulo,
             'autor' => $autor,
             'genero' => $genero,
+            'portada_url' => $portadaUrl,
             'descripcion' => $descripcion,
         ]);
 
@@ -35,7 +37,7 @@ final class RepositorioLibros
 
     public function obtenerPorId(int $idLibro): ?array
     {
-        $sql = 'SELECT l.id, l.id_usuario, l.titulo, l.autor, l.genero, l.descripcion, l.activo_intercambio,
+        $sql = 'SELECT l.id, l.id_usuario, l.titulo, l.autor, l.genero, l.portada_url, l.descripcion, l.activo_intercambio,
                        CONCAT(u.nombre, " ", u.apellidos) AS nombre_propietario
                 FROM libros l
                 INNER JOIN usuarios u ON u.id = l.id_usuario
@@ -63,7 +65,7 @@ final class RepositorioLibros
          * 4) Aplica busqueda por titulo/autor y filtro por genero.
          * 5) Opcionalmente excluye libros propios.
          */
-        $sql = 'SELECT l.id, l.titulo, l.autor, l.genero, l.descripcion, l.id_usuario,
+        $sql = 'SELECT l.id, l.titulo, l.autor, l.genero, l.portada_url, l.descripcion, l.id_usuario,
                        CONCAT(u.nombre, " ", u.apellidos) AS propietario
                 FROM libros l
                 INNER JOIN usuarios u ON u.id = l.id_usuario
@@ -80,8 +82,18 @@ final class RepositorioLibros
         }
 
         if ($genero !== '') {
-            $sql .= ' AND l.genero = :genero';
-            $parametros['genero'] = $genero;
+            $variantesGenero = $this->obtenerVariantesGenero($genero);
+            $condicionesGenero = [];
+
+            foreach ($variantesGenero as $indice => $variante) {
+                $claveParametro = 'genero_like_' . $indice;
+                $condicionesGenero[] = 'l.genero LIKE :' . $claveParametro;
+                $parametros[$claveParametro] = '%' . $variante . '%';
+            }
+
+            if (!empty($condicionesGenero)) {
+                $sql .= ' AND (' . implode(' OR ', $condicionesGenero) . ')';
+            }
         }
 
         if ($idUsuarioActual !== null) {
@@ -96,9 +108,103 @@ final class RepositorioLibros
         return $sentencia->fetchAll();
     }
 
+    /**
+     * @return string[]
+     */
+    private function obtenerVariantesGenero(string $textoGenero): array
+    {
+        $textoOriginal = trim($textoGenero);
+        $textoNormalizado = $this->normalizarTexto($textoOriginal);
+
+        $variantes = [
+            $textoOriginal,
+            $textoNormalizado,
+        ];
+
+        $equivalencias = [
+            'juvenil' => ['juvenile', 'young adult', 'kids', 'children'],
+            'juvenile' => ['juvenil', 'infantil'],
+            'infantil' => ['children', 'kids', 'juvenile'],
+            'ficcion' => ['fiction'],
+            'fiction' => ['ficcion'],
+            'fantasia' => ['fantasy'],
+            'fantasy' => ['fantasia'],
+            'ciencia ficcion' => ['science fiction', 'sci-fi', 'scifi'],
+            'science fiction' => ['ciencia ficcion', 'ciencia ficción'],
+            'biografia' => ['biography'],
+            'biography' => ['biografia', 'biografía'],
+            'autobiografia' => ['autobiography'],
+            'autobiography' => ['autobiografia', 'autobiografía'],
+            'poesia' => ['poetry'],
+            'poetry' => ['poesia', 'poesía'],
+            'aventura' => ['adventure'],
+            'adventure' => ['aventura'],
+            'historico' => ['historical', 'history'],
+            'historical' => ['historico', 'histórico'],
+            'historia' => ['history', 'historical'],
+            'romance' => ['romance'],
+            'terror' => ['horror'],
+            'horror' => ['terror'],
+        ];
+
+        foreach ($equivalencias as $clave => $sinonimos) {
+            if (!str_contains($textoNormalizado, $clave)) {
+                continue;
+            }
+
+            foreach ($sinonimos as $sinonimo) {
+                $variantes[] = $sinonimo;
+            }
+        }
+
+        $palabras = preg_split('/\s+/', $textoNormalizado) ?: [];
+        foreach ($palabras as $palabra) {
+            if ($palabra === '') {
+                continue;
+            }
+
+            if (!array_key_exists($palabra, $equivalencias)) {
+                continue;
+            }
+
+            foreach ($equivalencias[$palabra] as $sinonimo) {
+                $variantes[] = $sinonimo;
+            }
+        }
+
+        $variantesUnicas = [];
+        foreach ($variantes as $variante) {
+            $valor = trim((string) $variante);
+            if ($valor === '') {
+                continue;
+            }
+            $variantesUnicas[$valor] = true;
+        }
+
+        return array_keys($variantesUnicas);
+    }
+
+    private function normalizarTexto(string $texto): string
+    {
+        $texto = mb_strtolower(trim($texto));
+
+        return strtr(
+            $texto,
+            [
+                'á' => 'a',
+                'é' => 'e',
+                'í' => 'i',
+                'ó' => 'o',
+                'ú' => 'u',
+                'ü' => 'u',
+                'ñ' => 'n',
+            ]
+        );
+    }
+
     public function listarPorUsuario(int $idUsuario): array
     {
-        $sql = 'SELECT l.id, l.titulo, l.autor, l.genero, l.descripcion,
+        $sql = 'SELECT l.id, l.titulo, l.autor, l.genero, l.portada_url, l.descripcion,
                        CASE WHEN p.id IS NULL THEN 1 ELSE 0 END AS disponible
                 FROM libros l
                 LEFT JOIN prestamos p ON p.id_libro = l.id AND p.fecha_devolucion IS NULL
@@ -108,5 +214,32 @@ final class RepositorioLibros
         $sentencia->execute(['id_usuario' => $idUsuario]);
 
         return $sentencia->fetchAll();
+    }
+
+    public function existePrestamoActivoPorLibro(int $idLibro): bool
+    {
+        $sql = 'SELECT id
+                FROM prestamos
+                WHERE id_libro = :id_libro
+                  AND fecha_devolucion IS NULL
+                LIMIT 1';
+        $sentencia = $this->conexion->prepare($sql);
+        $sentencia->execute(['id_libro' => $idLibro]);
+
+        return (bool) $sentencia->fetch();
+    }
+
+    public function eliminarLibroDeUsuario(int $idLibro, int $idUsuario): bool
+    {
+        $sql = 'DELETE FROM libros
+                WHERE id = :id_libro
+                  AND id_usuario = :id_usuario';
+        $sentencia = $this->conexion->prepare($sql);
+        $sentencia->execute([
+            'id_libro' => $idLibro,
+            'id_usuario' => $idUsuario,
+        ]);
+
+        return $sentencia->rowCount() > 0;
     }
 }

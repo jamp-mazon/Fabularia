@@ -37,7 +37,7 @@ final class RepositorioPrestamos
     public function listarPrestamosDeUsuario(int $idUsuarioPrestado): array
     {
         $sql = 'SELECT p.id, p.fecha_prestamo, p.fecha_devolucion,
-                       l.id AS id_libro, l.titulo, l.autor,
+                       l.id AS id_libro, l.titulo, l.autor, l.portada_url,
                        CONCAT(u.nombre, " ", u.apellidos) AS nombre_dueno
                 FROM prestamos p
                 INNER JOIN libros l ON l.id = p.id_libro

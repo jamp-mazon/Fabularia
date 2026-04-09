@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 $urlCss = ($basePublica === '' ? '' : $basePublica) . '/assets/css/estilos.css';
 $urlJs = ($basePublica === '' ? '' : $basePublica) . '/assets/js/comun.js';
+$urlLogo = ($basePublica === '' ? '' : $basePublica) . '/assets/img/logo-fabularia-solo-crop-web.png';
 $urlRegistro = ($basePublica === '' ? '' : $basePublica) . '/registro';
 $urlApp = ($basePublica === '' ? '' : $basePublica) . '/app';
 ?>
@@ -14,12 +15,16 @@ $urlApp = ($basePublica === '' ? '' : $basePublica) . '/app';
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Fabularia | Login</title>
     <link rel="stylesheet" href="<?= htmlspecialchars($urlCss, ENT_QUOTES) ?>">
+    <link rel="icon" type="image/png" href="<?= htmlspecialchars($urlLogo, ENT_QUOTES) ?>">
 </head>
 <body>
-<main class="pagina">
+<main class="pagina pagina--auth">
     <section class="auth-layout">
         <article class="tarjeta info-card">
-            <h1>Fabularia</h1>
+            <div class="marca-bloque marca-bloque--auth">
+                <img class="marca-logo marca-logo--auth" src="<?= htmlspecialchars($urlLogo, ENT_QUOTES) ?>" alt="Logo de Fabularia">
+                <h1 class="marca-titulo">Fabularia</h1>
+            </div>
             <p>Tu espacio para intercambiar libros con otros lectores. Publica, pide prestado y gestiona tus intercambios en un mismo panel.</p>
             <p class="pequeno">Accede con tu cuenta para entrar en la aplicacion.</p>
         </article>
@@ -30,7 +35,7 @@ $urlApp = ($basePublica === '' ? '' : $basePublica) . '/app';
                 <label for="loginEmail">Email</label>
                 <input id="loginEmail" name="email" type="email" required>
 
-                <label for="loginContrasena">Contrasena</label>
+                <label for="loginContrasena">Contrase&ntilde;a</label>
                 <input id="loginContrasena" name="contrasena" type="password" required>
 
                 <button type="submit" style="margin-top:1rem;">Entrar</button>
@@ -75,3 +80,4 @@ $urlApp = ($basePublica === '' ? '' : $basePublica) . '/app';
 </script>
 </body>
 </html>
+

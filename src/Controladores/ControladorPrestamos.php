@@ -126,6 +126,7 @@ final class ControladorPrestamos
             'libro' => [
                 'id' => (int) ($libro['id'] ?? 0),
                 'titulo' => (string) ($libro['titulo'] ?? ''),
+                'portada_url' => $libro['portada_url'] ?? null,
             ],
             'usuario_dueno' => [
                 'id' => (int) $usuarioDueno['id'],

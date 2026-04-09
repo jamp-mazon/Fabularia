@@ -3,7 +3,8 @@
 Aplicacion en PHP con API REST y formularios para gestionar:
 
 - Registro e inicio de sesion de usuarios (con nombre, apellidos y telefono opcional).
-- Publicacion de libros por parte de cada usuario.
+- Publicacion de libros por parte de cada usuario (con portada opcional por URL).
+- Autocompletado de libros desde catalogo global (Google Books en español).
 - Busqueda de libros disponibles para intercambio con filtro por genero.
 - Solicitud y devolucion de prestamos.
 - Notificacion a n8n cuando se crea un prestamo (para automatizar Telegram).
@@ -41,7 +42,10 @@ cp .env.example .env
 N8N_WEBHOOK_PRESTAMO=https://n8n.example/webhook-test/REDACTED
 TELEGRAM_BOT_URL_BASE=https://t.me/Fabularia_bot?start=
 TELEGRAM_VINCULACION_TOKEN=cambia_este_token_compartido_con_n8n
+GOOGLE_BOOKS_API_KEY=
 ```
+
+`GOOGLE_BOOKS_API_KEY` es opcional, pero recomendado para limites de uso mas altos del catalogo externo.
 
 4. Crea la base de datos y aplica el esquema:
 
@@ -55,6 +59,7 @@ Si ya tenias tablas creadas antes de este cambio, aplica tambien:
 SOURCE database/migracion_apellidos_genero.sql;
 SOURCE database/migracion_telefono_usuarios.sql;
 SOURCE database/migracion_telegram_usuarios.sql;
+SOURCE database/migracion_portada_libros.sql;
 ```
 
 5. Sirve la carpeta `public/` como raiz web o accede a:
@@ -75,19 +80,45 @@ Rutas de interfaz:
 - `POST /api/usuarios/login`
 - `POST /api/usuarios/logout`
 - `GET /api/usuarios/yo`
+- `POST /api/usuarios/cambiar-contrasena`
+- `POST /api/usuarios/telegram/desvincular`
+- `DELETE /api/usuarios/cuenta`
+- `GET /api/catalogo/sugerencias?texto=harry`
 - `POST /api/telegram/vincular`
 - `POST /api/libros`
 - `GET /api/libros?buscar=texto&genero=Novela`
 - `GET /api/libros/mios`
+- `DELETE /api/libros` (JSON: `id_libro`)
 - `POST /api/prestamos`
 - `GET /api/prestamos/mios`
 - `POST /api/prestamos/devolver`
 
+El endpoint de catalogo global devuelve sugerencias con:
+
+- `titulo`
+- `autor`
+- `genero`
+- `descripcion`
+- `portada_url`
+
 Cuando se ejecuta `POST /api/prestamos`, la aplicacion envia un webhook a n8n con:
 
-- libro: `id`, `titulo`
+- libro: `id`, `titulo`, `portada_url`
 - usuario_dueno: `id`, `nombre`, `email`, `telefono`, `telegram_chat_id`, `telegram_usuario`
 - usuario_receptor: `id`, `nombre`, `email`, `telefono`, `telegram_chat_id`, `telegram_usuario`
+
+La interfaz `/app` incluye pestaña de **Ajustes** para:
+
+- cambiar contrasena,
+- desvincular Telegram,
+- cerrar sesion,
+- eliminar cuenta (requiere confirmacion y contrasena).
+
+Al eliminar una cuenta se limpian primero los prestamos vinculados a ese usuario
+para respetar las claves foraneas actuales.
+
+En `Mis libros`, el propietario puede eliminar un libro solo si no tiene
+prestamo activo. Si esta prestado, la API responde error de conflicto (409).
 
 ## Vinculacion Telegram
 
@@ -115,6 +146,7 @@ Tambien puedes enviar el token en cabecera HTTP `X-Vinculacion-Token`.
 - `database/migracion_apellidos_genero.sql`: alteraciones para anadir `apellidos` y `genero` a esquemas existentes.
 - `database/migracion_telefono_usuarios.sql`: alteracion para anadir `telefono` en usuarios.
 - `database/migracion_telegram_usuarios.sql`: alteracion para anadir `telegram_chat_id` y `telegram_usuario`.
+- `database/migracion_portada_libros.sql`: alteracion para anadir `portada_url` en libros.
 - `src/`: controladores, repositorios, enrutador y utilidades HTTP.
 - `public/index.php`: front controller de la API y de la vista principal.
 - `public/vistas/login.php`: pantalla de acceso.

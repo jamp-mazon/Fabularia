@@ -148,6 +148,153 @@ final class ControladorUsuarios
         return [200, ['autenticado' => true, 'usuario' => $usuario]];
     }
 
+    /**
+     * @return array{0: int, 1: array<string, mixed>}
+     */
+    public function cambiarContrasena(): array
+    {
+        $idUsuario = (int) ($_SESSION['id_usuario'] ?? 0);
+        if ($idUsuario <= 0) {
+            return [401, ['error' => 'Debes iniciar sesion para cambiar la contrasena.']];
+        }
+
+        $datos = SolicitudHttp::obtenerDatosEntrada();
+        $contrasenaActual = SolicitudHttp::obtenerTexto($datos, 'contrasena_actual');
+        $contrasenaNueva = SolicitudHttp::obtenerTexto($datos, 'contrasena_nueva');
+        $confirmarContrasena = SolicitudHttp::obtenerTexto($datos, 'confirmar_contrasena');
+
+        if ($contrasenaActual === '' || $contrasenaNueva === '' || $confirmarContrasena === '') {
+            return [422, ['error' => 'Debes completar todos los campos de contrasena.']];
+        }
+
+        if ($contrasenaNueva !== $confirmarContrasena) {
+            return [422, ['error' => 'La nueva contrasena y su confirmacion no coinciden.']];
+        }
+
+        if (mb_strlen($contrasenaNueva) < 6) {
+            return [422, ['error' => 'La nueva contrasena debe tener al menos 6 caracteres.']];
+        }
+
+        $contrasenaHashActual = $this->repositorioUsuarios->obtenerContrasenaHashPorId($idUsuario);
+        if ($contrasenaHashActual === null) {
+            return [404, ['error' => 'No se encontro el usuario autenticado.']];
+        }
+
+        if (!password_verify($contrasenaActual, $contrasenaHashActual)) {
+            return [401, ['error' => 'La contrasena actual es incorrecta.']];
+        }
+
+        if (password_verify($contrasenaNueva, $contrasenaHashActual)) {
+            return [422, ['error' => 'La nueva contrasena no puede ser igual a la actual.']];
+        }
+
+        $actualizado = $this->repositorioUsuarios->actualizarContrasena(
+            $idUsuario,
+            password_hash($contrasenaNueva, PASSWORD_DEFAULT)
+        );
+
+        if (!$actualizado) {
+            return [404, ['error' => 'No se pudo actualizar la contrasena del usuario.']];
+        }
+
+        $this->logger->info('Contrasena actualizada', ['id_usuario' => $idUsuario]);
+
+        return [200, ['mensaje' => 'Contrasena actualizada correctamente.']];
+    }
+
+    /**
+     * @return array{0: int, 1: array<string, mixed>}
+     */
+    public function actualizarTelefono(): array
+    {
+        $idUsuario = (int) ($_SESSION['id_usuario'] ?? 0);
+        if ($idUsuario <= 0) {
+            return [401, ['error' => 'Debes iniciar sesion para actualizar el telefono.']];
+        }
+
+        $datos = SolicitudHttp::obtenerDatosEntrada();
+        $telefono = SolicitudHttp::obtenerTexto($datos, 'telefono');
+        $telefono = $telefono === '' ? null : $telefono;
+
+        if ($telefono !== null && !$this->telefonoValido($telefono)) {
+            return [422, ['error' => 'El telefono no tiene un formato valido.']];
+        }
+
+        $usuario = $this->repositorioUsuarios->obtenerPorId($idUsuario);
+        if ($usuario === null) {
+            return [404, ['error' => 'No se encontro el usuario autenticado.']];
+        }
+
+        $actualizado = $this->repositorioUsuarios->actualizarTelefono($idUsuario, $telefono);
+        if (!$actualizado && (($usuario['telefono'] ?? null) !== $telefono)) {
+            return [404, ['error' => 'No se pudo actualizar el telefono.']];
+        }
+
+        $this->logger->info('Telefono actualizado por el usuario', [
+            'id_usuario' => $idUsuario,
+            'telefono' => $telefono,
+        ]);
+
+        return [200, ['mensaje' => 'Telefono actualizado correctamente.', 'telefono' => $telefono]];
+    }
+
+    /**
+     * @return array{0: int, 1: array<string, mixed>}
+     */
+    public function desvincularTelegram(): array
+    {
+        $idUsuario = (int) ($_SESSION['id_usuario'] ?? 0);
+        if ($idUsuario <= 0) {
+            return [401, ['error' => 'Debes iniciar sesion para desvincular Telegram.']];
+        }
+
+        $usuario = $this->repositorioUsuarios->obtenerPorId($idUsuario);
+        if ($usuario === null) {
+            return [404, ['error' => 'No se encontro el usuario autenticado.']];
+        }
+
+        $this->repositorioUsuarios->desvincularTelegram($idUsuario);
+        $this->logger->info('Telegram desvinculado por el usuario', ['id_usuario' => $idUsuario]);
+
+        return [200, ['mensaje' => 'Telegram desvinculado correctamente.']];
+    }
+
+    /**
+     * @return array{0: int, 1: array<string, mixed>}
+     */
+    public function eliminarCuenta(): array
+    {
+        $idUsuario = (int) ($_SESSION['id_usuario'] ?? 0);
+        if ($idUsuario <= 0) {
+            return [401, ['error' => 'Debes iniciar sesion para eliminar la cuenta.']];
+        }
+
+        $datos = SolicitudHttp::obtenerDatosEntrada();
+        $contrasena = SolicitudHttp::obtenerTexto($datos, 'contrasena');
+        if ($contrasena === '') {
+            return [422, ['error' => 'Debes indicar tu contrasena para eliminar la cuenta.']];
+        }
+
+        $contrasenaHashActual = $this->repositorioUsuarios->obtenerContrasenaHashPorId($idUsuario);
+        if ($contrasenaHashActual === null) {
+            return [404, ['error' => 'No se encontro el usuario autenticado.']];
+        }
+
+        if (!password_verify($contrasena, $contrasenaHashActual)) {
+            return [401, ['error' => 'La contrasena es incorrecta.']];
+        }
+
+        $eliminado = $this->repositorioUsuarios->eliminarCuentaConDependencias($idUsuario);
+        if (!$eliminado) {
+            return [404, ['error' => 'No se pudo eliminar la cuenta solicitada.']];
+        }
+
+        unset($_SESSION['id_usuario'], $_SESSION['nombre_usuario']);
+        $this->logger->info('Cuenta eliminada por el usuario', ['id_usuario' => $idUsuario]);
+
+        return [200, ['mensaje' => 'Cuenta eliminada correctamente.']];
+    }
+
     private function telefonoValido(string $telefono): bool
     {
         return preg_match('/^[0-9+()\\-\\s]{6,30}$/', $telefono) === 1;

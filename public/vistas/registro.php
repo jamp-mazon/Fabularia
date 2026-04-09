@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 $urlCss = ($basePublica === '' ? '' : $basePublica) . '/assets/css/estilos.css';
 $urlJs = ($basePublica === '' ? '' : $basePublica) . '/assets/js/comun.js';
+$urlLogo = ($basePublica === '' ? '' : $basePublica) . '/assets/img/logo-fabularia-solo-crop-web.png';
 $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
 $urlApp = ($basePublica === '' ? '' : $basePublica) . '/app';
 ?>
@@ -14,11 +15,16 @@ $urlApp = ($basePublica === '' ? '' : $basePublica) . '/app';
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Fabularia | Registro</title>
     <link rel="stylesheet" href="<?= htmlspecialchars($urlCss, ENT_QUOTES) ?>">
+    <link rel="icon" type="image/png" href="<?= htmlspecialchars($urlLogo, ENT_QUOTES) ?>">
 </head>
 <body>
 <main class="pagina">
     <section class="auth-layout">
         <article class="tarjeta info-card">
+            <div class="marca-bloque marca-bloque--auth">
+                <img class="marca-logo marca-logo--auth" src="<?= htmlspecialchars($urlLogo, ENT_QUOTES) ?>" alt="Logo de Fabularia">
+                <p class="marca-titulo">Fabularia</p>
+            </div>
             <h1>Crea tu cuenta</h1>
             <p>Registra tus datos y publica los libros que quieres intercambiar. Tambien puedes vincular Telegram para recibir avisos cuando te pidan un libro.</p>
         </article>
@@ -38,7 +44,7 @@ $urlApp = ($basePublica === '' ? '' : $basePublica) . '/app';
                 <label for="registroTelefono">Telefono (opcional)</label>
                 <input id="registroTelefono" name="telefono" type="text" placeholder="+34 600 000 000">
 
-                <label for="registroContrasena">Contrasena</label>
+                <label for="registroContrasena">Contrase&ntilde;a</label>
                 <input id="registroContrasena" name="contrasena" type="password" required>
 
                 <label class="fila-check">
@@ -109,3 +115,5 @@ $urlApp = ($basePublica === '' ? '' : $basePublica) . '/app';
 </script>
 </body>
 </html>
+
+
