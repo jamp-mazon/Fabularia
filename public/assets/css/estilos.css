@@ -599,15 +599,23 @@ button:hover {
 
 .catalogo-card-acciones {
     margin-top: 0.65rem;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
     gap: 0.45rem;
 }
 
 .catalogo-card-acciones button {
-    width: 100%;
-    min-width: 0;
+    width: auto;
+    min-width: 126px;
+    max-width: 180px;
     padding: 0.5rem 0.72rem;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    white-space: nowrap;
 }
 
 .catalogo-vacio {
@@ -719,8 +727,23 @@ button:hover {
 .libro-item {
     display: grid;
     grid-template-columns: 78px 1fr auto;
-    gap: 0.8rem;
+    gap: 1rem;
     align-items: start;
+}
+
+.libro-item > div:nth-child(2) {
+    min-width: 0;
+    padding-left: 0.1rem;
+}
+
+.libro-item strong {
+    display: block;
+    line-height: 1.3;
+    margin-bottom: 0.25rem;
+}
+
+.libro-item .pequeno {
+    margin: 0.16rem 0;
 }
 
 .libro-item--sin-accion {
@@ -731,6 +754,29 @@ button:hover {
     display: flex;
     justify-content: flex-end;
     align-items: flex-start;
+}
+
+.libro-accion--prestamo {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    justify-content: flex-end;
+}
+
+.libro-accion > button,
+.libro-accion--prestamo > button {
+    white-space: nowrap;
+}
+
+.libro-accion--prestamo > button {
+    width: 210px;
+    min-width: 210px;
+    max-width: 210px;
+}
+
+.libro-accion--prestamo .pequeno {
+    width: 210px;
+    text-align: right;
 }
 
 .boton-eliminar-mini {
@@ -839,12 +885,16 @@ button:hover {
 
 .modal-libro-contenido {
     width: min(820px, 96vw);
+    max-height: 88vh;
     background: #fff;
     border: 1px solid #d6e1ee;
     border-radius: 14px;
     box-shadow: 0 25px 65px rgba(10, 22, 40, 0.33);
     padding: 1rem;
     position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .modal-cerrar {
@@ -866,6 +916,8 @@ button:hover {
     display: grid;
     grid-template-columns: 185px 1fr;
     gap: 1rem;
+    min-height: 0;
+    flex: 1;
 }
 
 .detalle-libro-portada .portada-wrap {
@@ -882,22 +934,43 @@ button:hover {
     margin: 0.2rem 0;
 }
 
+.detalle-libro-texto {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
 .detalle-libro-descripcion {
     margin: 0.7rem 0 0;
     white-space: pre-wrap;
     line-height: 1.55;
     color: #46566d;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 0.2rem;
 }
 
 .detalle-libro-acciones {
-    margin-top: 1rem;
+    margin-top: auto;
+    padding-top: 0.7rem;
     display: flex;
     gap: 0.6rem;
+    background: #fff;
 }
 
 .detalle-libro-acciones button {
     width: auto;
     min-width: 170px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+@media (max-width: 1180px) {
+    .catalogo-card-acciones button {
+        min-width: 120px;
+    }
 }
 
 @media (max-width: 930px) {
@@ -954,7 +1027,21 @@ button:hover {
     }
 
     .libro-item {
-        grid-template-columns: 64px 1fr;
+        grid-template-columns: 64px minmax(0, 1fr);
+        gap: 0.85rem;
+    }
+
+    .libro-accion,
+    .libro-accion--prestamo {
+        grid-column: 1 / -1;
+        justify-content: flex-start;
+        justify-items: start;
+    }
+
+    .libro-accion > button,
+    .libro-accion--prestamo > button {
+        width: auto;
+        min-width: 144px;
     }
 
     .marca-logo--auth {
@@ -977,6 +1064,7 @@ button:hover {
 
     .modal-libro-contenido {
         width: min(94vw, 540px);
+        max-height: 84vh;
     }
 
     .detalle-libro-layout {
@@ -986,5 +1074,155 @@ button:hover {
     .detalle-libro-portada .portada-wrap {
         width: 130px;
         height: 190px;
+    }
+
+    .detalle-libro-acciones {
+        justify-content: center;
+    }
+}
+
+@media (max-width: 700px) {
+    .pagina {
+        padding: 1rem 0.6rem 2rem;
+    }
+
+    .marca-bloque--app {
+        gap: 0.55rem;
+    }
+
+    .marca-logo--app {
+        width: 48px;
+        height: 48px;
+    }
+
+    .subtitulo {
+        font-size: 0.95rem;
+    }
+
+    .acceso-usuario {
+        width: 100%;
+        justify-content: space-between;
+        gap: 0.5rem;
+        flex-wrap: nowrap;
+    }
+
+    .acceso-usuario button {
+        min-height: 44px;
+        min-width: 130px;
+        width: auto;
+    }
+
+    .bienvenida-inline {
+        min-height: 44px;
+        font-size: 0.95rem;
+        white-space: normal;
+        line-height: 1.2;
+        padding: 0.45rem 0.68rem;
+    }
+
+    .mensaje--inline {
+        max-width: 100%;
+        width: 100%;
+    }
+
+    .tab-btn {
+        min-width: 118px;
+        padding: 0.55rem 0.7rem;
+    }
+
+    .catalogo-card {
+        grid-template-columns: 1fr;
+        gap: 0.55rem;
+    }
+
+    .catalogo-card-portada {
+        display: flex;
+        justify-content: center;
+    }
+
+    .catalogo-card .portada-wrap {
+        width: 120px;
+        height: 176px;
+    }
+
+    .catalogo-titulo-btn {
+        font-size: 1rem;
+    }
+
+    .catalogo-descripcion {
+        -webkit-line-clamp: 2;
+        max-height: 2.95em;
+    }
+
+    .catalogo-card-acciones {
+        justify-content: center;
+    }
+
+    .catalogo-card-acciones button {
+        min-width: 132px;
+    }
+
+    .libro-item {
+        grid-template-columns: 92px minmax(0, 1fr);
+        gap: 0.8rem;
+    }
+
+    .libro-item .portada-wrap {
+        width: 92px;
+        height: 132px;
+    }
+
+    .libro-accion,
+    .libro-accion--prestamo {
+        justify-content: flex-start;
+        justify-items: start;
+    }
+
+    .libro-accion > button,
+    .libro-accion--prestamo > button {
+        width: auto;
+        min-width: 132px;
+    }
+
+    .modal-libro {
+        padding: 0.65rem;
+    }
+
+    .modal-libro-contenido {
+        width: 100%;
+        height: min(82vh, 620px);
+        max-height: min(82vh, 620px);
+        overflow: hidden;
+        padding: 0.85rem;
+    }
+
+    .detalle-libro-layout {
+        height: 100%;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        gap: 0.65rem;
+    }
+
+    .detalle-libro-portada {
+        display: flex;
+        justify-content: center;
+    }
+
+    .detalle-libro-texto {
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .detalle-libro-descripcion {
+        margin-top: 0.55rem;
+        max-height: 36vh;
+        overflow-y: auto;
+        padding-right: 0.2rem;
+    }
+
+    .detalle-libro-acciones button {
+        width: 100%;
+        min-width: 0;
     }
 }

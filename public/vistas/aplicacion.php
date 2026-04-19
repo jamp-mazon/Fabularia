@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
-$urlCss = ($basePublica === '' ? '' : $basePublica) . '/assets/css/estilos.css';
-$urlJs = ($basePublica === '' ? '' : $basePublica) . '/assets/js/comun.js';
+$versionCss = (string) (@filemtime(__DIR__ . '/../assets/css/estilos.css') ?: time());
+$versionJs = (string) (@filemtime(__DIR__ . '/../assets/js/comun.js') ?: time());
+$urlCss = ($basePublica === '' ? '' : $basePublica) . '/assets/css/estilos.css?v=' . rawurlencode($versionCss);
+$urlJs = ($basePublica === '' ? '' : $basePublica) . '/assets/js/comun.js?v=' . rawurlencode($versionJs);
 $urlLogo = ($basePublica === '' ? '' : $basePublica) . '/assets/img/logo-fabularia-solo-crop-web.png';
 $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
 ?>
@@ -229,6 +231,7 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
     const detalleLibroDescripcion = document.getElementById("detalleLibroDescripcion");
     const botonSolicitarDetalle = document.getElementById("botonSolicitarDetalle");
     const librosCatalogoPorId = new Map();
+    const prestamosPorId = new Map();
     let temporizadorMensaje = null;
 
     function escaparHtml(texto) {
@@ -325,9 +328,7 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         formulario.autor.value = sugerencia.autor || "";
         formulario.genero.value = sugerencia.genero || "";
         formulario.portada_url.value = sugerencia.portada_url || "";
-        if (sugerencia.descripcion) {
-            formulario.descripcion.value = sugerencia.descripcion;
-        }
+        formulario.descripcion.value = soloDescripcionEspanol(sugerencia.descripcion || "");
     }
 
     function renderizarSugerenciasCatalogo(sugerencias) {
@@ -362,8 +363,58 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         }
     }
 
+    function pareceTextoEnIngles(texto) {
+        const palabras = String(texto ?? "")
+            .toLowerCase()
+            .split(/[^a-z]+/g)
+            .filter(Boolean);
+
+        if (palabras.length < 12) {
+            return false;
+        }
+
+        const comunes = new Set([
+            "the", "and", "with", "that", "this", "from", "into", "your", "their", "about", "over",
+            "under", "have", "has", "been", "will", "would", "could", "should", "first", "before",
+            "until", "where", "when", "then", "while", "is", "are", "was", "were", "to", "of", "in",
+            "on", "for", "as", "at", "by", "it", "its", "he", "she", "they", "him", "her", "them"
+        ]);
+
+        let coincidencias = 0;
+        for (const palabra of palabras) {
+            if (comunes.has(palabra)) {
+                coincidencias += 1;
+            }
+        }
+
+        return coincidencias >= 6 || (coincidencias / palabras.length) >= 0.22;
+    }
+
+    function soloDescripcionEspanol(texto) {
+        let limpio = String(texto ?? "").trim();
+        if (!limpio) {
+            return "";
+        }
+
+        const marcadorIngles = limpio.match(/\b(?:ENGLISH DESCRIPTION|DESCRIPTION IN ENGLISH|ENGLISH VERSION)\b/i);
+        if (marcadorIngles && typeof marcadorIngles.index === "number") {
+            limpio = limpio.slice(0, marcadorIngles.index).trim();
+        }
+
+        const bloques = limpio
+            .split(/\n{2,}/)
+            .map((bloque) => bloque.trim())
+            .filter((bloque) => bloque !== "");
+
+        while (bloques.length > 1 && pareceTextoEnIngles(bloques[bloques.length - 1])) {
+            bloques.pop();
+        }
+
+        return bloques.join("\n\n").trim();
+    }
+
     function recortarTexto(texto, maximoCaracteres = 180) {
-        const limpio = String(texto ?? "").trim();
+        const limpio = soloDescripcionEspanol(texto);
         if (limpio.length <= maximoCaracteres) {
             return limpio;
         }
@@ -382,8 +433,36 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         detalleLibroTitulo.textContent = `${libro.titulo} - ${libro.autor}`;
         detalleLibroMeta.textContent = `Genero: ${libro.genero || "Sin genero"}`;
         detalleLibroPropietario.textContent = `Propietario: ${libro.propietario || "No disponible"}`;
-        detalleLibroDescripcion.textContent = (libro.descripcion || "").trim() || "Sin descripcion disponible.";
+        const descripcion = soloDescripcionEspanol(libro.descripcion || "");
+        detalleLibroDescripcion.textContent = descripcion || "Sin descripcion disponible.";
+        botonSolicitarDetalle.hidden = false;
+        botonSolicitarDetalle.textContent = "Solicitar prestamo";
+        botonSolicitarDetalle.dataset.modo = "catalogo";
         botonSolicitarDetalle.dataset.idLibro = String(libro.id);
+        botonSolicitarDetalle.dataset.idPrestamo = "";
+        modalDetalleLibro.hidden = false;
+        document.body.classList.add("modal-abierto");
+    }
+
+    function abrirDetallePrestamo(idPrestamo) {
+        const prestamo = prestamosPorId.get(idPrestamo);
+        if (!prestamo) {
+            mostrarMensaje("No se encontro la ficha del prestamo seleccionado.", "error");
+            return;
+        }
+
+        const activo = prestamo.fecha_devolucion === null;
+        detalleLibroPortada.innerHTML = bloquePortada(prestamo);
+        detalleLibroTitulo.textContent = `${prestamo.titulo} - ${prestamo.autor}`;
+        detalleLibroMeta.textContent = `Genero: ${prestamo.genero || "Sin genero"}`;
+        detalleLibroPropietario.textContent = `Dueno: ${prestamo.nombre_dueno || "No disponible"} | Prestado: ${prestamo.fecha_prestamo || "-"}`;
+        const descripcion = soloDescripcionEspanol(prestamo.descripcion || "");
+        detalleLibroDescripcion.textContent = descripcion || "Sin descripcion disponible.";
+        botonSolicitarDetalle.dataset.modo = "prestamo";
+        botonSolicitarDetalle.dataset.idLibro = "";
+        botonSolicitarDetalle.dataset.idPrestamo = String(prestamo.id);
+        botonSolicitarDetalle.hidden = !activo;
+        botonSolicitarDetalle.textContent = "Devolver prestamo";
         modalDetalleLibro.hidden = false;
         document.body.classList.add("modal-abierto");
     }
@@ -391,7 +470,11 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
     function cerrarFichaLibro() {
         modalDetalleLibro.hidden = true;
         document.body.classList.remove("modal-abierto");
+        botonSolicitarDetalle.hidden = false;
+        botonSolicitarDetalle.textContent = "Solicitar prestamo";
+        botonSolicitarDetalle.dataset.modo = "catalogo";
         botonSolicitarDetalle.dataset.idLibro = "";
+        botonSolicitarDetalle.dataset.idPrestamo = "";
     }
 
     async function solicitarPrestamoDesdeCatalogo(idLibro) {
@@ -485,15 +568,18 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
     function renderizarMisPrestamos(prestamos) {
         const lista = document.getElementById("listaMisPrestamos");
         lista.innerHTML = "";
+        prestamosPorId.clear();
+
         if (!prestamos.length) {
             lista.innerHTML = "<li>No tienes prestamos registrados.</li>";
             return;
         }
 
         for (const prestamo of prestamos) {
+            prestamosPorId.set(Number(prestamo.id), prestamo);
             const activo = prestamo.fecha_devolucion === null;
             const botonDevolver = activo
-                ? `<button type="button" data-id-prestamo="${prestamo.id}">Marcar devolucion</button>`
+                ? `<button type="button" data-id-prestamo="${prestamo.id}">Devolver</button>`
                 : `<span class="pequeno">Devuelto: ${escaparHtml(prestamo.fecha_devolucion)}</span>`;
 
             const elemento = document.createElement("li");
@@ -502,10 +588,14 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
                     ${bloquePortada(prestamo)}
                     <div>
                         <strong>${escaparHtml(prestamo.titulo)} - ${escaparHtml(prestamo.autor)}</strong>
+                        <p class="pequeno">Genero: ${escaparHtml(prestamo.genero || "General")}</p>
                         <p class="pequeno">Dueno: ${escaparHtml(prestamo.nombre_dueno)}</p>
                         <p class="pequeno">Prestado: ${escaparHtml(prestamo.fecha_prestamo)}</p>
                     </div>
-                    <div>${botonDevolver}</div>
+                    <div class="libro-accion libro-accion--prestamo">
+                        <button type="button" class="boton-secundario" data-id-prestamo-detalle="${prestamo.id}">Ver ficha</button>
+                        ${botonDevolver}
+                    </div>
                 </div>
             `;
             lista.appendChild(elemento);
@@ -666,10 +756,24 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
     });
 
     botonSolicitarDetalle.addEventListener("click", async () => {
+        const modo = botonSolicitarDetalle.dataset.modo || "catalogo";
         const idLibro = Number(botonSolicitarDetalle.dataset.idLibro || "0");
+        const idPrestamo = Number(botonSolicitarDetalle.dataset.idPrestamo || "0");
 
         limpiarMensaje();
         try {
+            if (modo === "prestamo") {
+                if (Number.isNaN(idPrestamo) || idPrestamo <= 0) {
+                    throw new Error("No se pudo identificar el prestamo.");
+                }
+                await window.fabularia.llamarApi("/prestamos/devolver", "POST", { id_prestamo: idPrestamo });
+                await cargarPanelCompleto();
+                activarTab("prestamos");
+                mostrarMensaje("Prestamo devuelto correctamente.", "ok");
+                cerrarFichaLibro();
+                return;
+            }
+
             await solicitarPrestamoDesdeCatalogo(idLibro);
             cerrarFichaLibro();
             mostrarMensaje("Prestamo solicitado correctamente.", "ok");
@@ -679,6 +783,12 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
     });
 
     document.getElementById("listaMisPrestamos").addEventListener("click", async (evento) => {
+        const botonDetalle = evento.target.closest("button[data-id-prestamo-detalle]");
+        if (botonDetalle) {
+            abrirDetallePrestamo(Number(botonDetalle.dataset.idPrestamoDetalle));
+            return;
+        }
+
         const boton = evento.target.closest("button[data-id-prestamo]");
         if (!boton) return;
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fabularia\Repositorios;
 
+use Fabularia\Servicios\NormalizadorGeneroLibros;
 use PDO;
 
 final class RepositorioLibros
@@ -115,11 +116,25 @@ final class RepositorioLibros
     {
         $textoOriginal = trim($textoGenero);
         $textoNormalizado = $this->normalizarTexto($textoOriginal);
+        $textoTraducido = NormalizadorGeneroLibros::normalizarParaGuardar($textoOriginal);
+        $textoTraducidoNormalizado = $this->normalizarTexto($textoTraducido);
 
         $variantes = [
             $textoOriginal,
             $textoNormalizado,
+            $textoTraducido,
+            $textoTraducidoNormalizado,
         ];
+
+        $partesTraducidas = preg_split('/\s*\/\s*/u', $textoTraducido) ?: [];
+        foreach ($partesTraducidas as $parteTraducida) {
+            $parteTraducida = trim($parteTraducida);
+            if ($parteTraducida === '') {
+                continue;
+            }
+            $variantes[] = $parteTraducida;
+            $variantes[] = $this->normalizarTexto($parteTraducida);
+        }
 
         $equivalencias = [
             'juvenil' => ['juvenile', 'young adult', 'kids', 'children'],
@@ -127,24 +142,35 @@ final class RepositorioLibros
             'infantil' => ['children', 'kids', 'juvenile'],
             'ficcion' => ['fiction'],
             'fiction' => ['ficcion'],
+            'no ficcion' => ['nonfiction', 'non fiction'],
+            'nonfiction' => ['no ficcion'],
             'fantasia' => ['fantasy'],
             'fantasy' => ['fantasia'],
             'ciencia ficcion' => ['science fiction', 'sci-fi', 'scifi'],
-            'science fiction' => ['ciencia ficcion', 'ciencia ficción'],
+            'science fiction' => ['ciencia ficcion'],
             'biografia' => ['biography'],
-            'biography' => ['biografia', 'biografía'],
+            'biography' => ['biografia'],
             'autobiografia' => ['autobiography'],
-            'autobiography' => ['autobiografia', 'autobiografía'],
+            'autobiography' => ['autobiografia'],
             'poesia' => ['poetry'],
-            'poetry' => ['poesia', 'poesía'],
+            'poetry' => ['poesia'],
             'aventura' => ['adventure'],
             'adventure' => ['aventura'],
             'historico' => ['historical', 'history'],
-            'historical' => ['historico', 'histórico'],
+            'historical' => ['historico'],
             'historia' => ['history', 'historical'],
             'romance' => ['romance'],
             'terror' => ['horror'],
             'horror' => ['terror'],
+            'deportes' => ['sports', 'sport', 'recreation', 'sports recreation'],
+            'sport' => ['deportes'],
+            'sports' => ['deportes'],
+            'recreation' => ['ocio', 'deportes'],
+            'ocio' => ['recreation', 'sports'],
+            'familia' => ['family', 'relationships'],
+            'relaciones' => ['relationship', 'relationships', 'family'],
+            'family' => ['familia', 'relaciones'],
+            'relationships' => ['relaciones', 'familia'],
         ];
 
         foreach ($equivalencias as $clave => $sinonimos) {
@@ -191,13 +217,20 @@ final class RepositorioLibros
         return strtr(
             $texto,
             [
-                'á' => 'a',
-                'é' => 'e',
-                'í' => 'i',
-                'ó' => 'o',
-                'ú' => 'u',
-                'ü' => 'u',
-                'ñ' => 'n',
+                'Ã¡' => 'a',
+                'Ã©' => 'e',
+                'Ã­' => 'i',
+                'Ã³' => 'o',
+                'Ãº' => 'u',
+                'Ã¼' => 'u',
+                'Ã±' => 'n',
+                'ÃƒÂ¡' => 'a',
+                'ÃƒÂ©' => 'e',
+                'ÃƒÂ­' => 'i',
+                'ÃƒÂ³' => 'o',
+                'ÃƒÂº' => 'u',
+                'ÃƒÂ¼' => 'u',
+                'ÃƒÂ±' => 'n',
             ]
         );
     }

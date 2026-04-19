@@ -8,6 +8,7 @@ use Fabularia\Http\SolicitudHttp;
 use Fabularia\Repositorios\RepositorioLibros;
 use Fabularia\Repositorios\RepositorioPrestamos;
 use Fabularia\Repositorios\RepositorioUsuarios;
+use Fabularia\Servicios\NormalizadorGeneroLibros;
 use Fabularia\Servicios\ServicioWebhookPrestamos;
 use Monolog\Logger;
 
@@ -73,6 +74,10 @@ final class ControladorPrestamos
     {
         $idUsuario = (int) ($_SESSION['id_usuario'] ?? 0);
         $prestamos = $this->repositorioPrestamos->listarPrestamosDeUsuario($idUsuario);
+        foreach ($prestamos as &$prestamo) {
+            $prestamo['genero'] = NormalizadorGeneroLibros::normalizarParaGuardar((string) ($prestamo['genero'] ?? ''));
+        }
+        unset($prestamo);
         return [200, ['prestamos' => $prestamos]];
     }
 

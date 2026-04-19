@@ -152,9 +152,7 @@ final class ServicioCatalogoLibros
 
         $categorias = $volumeInfo['categories'] ?? [];
         $genero = is_array($categorias) && count($categorias) > 0 ? trim((string) $categorias[0]) : '';
-        if ($genero === '') {
-            $genero = 'General';
-        }
+        $genero = NormalizadorGeneroLibros::normalizarParaGuardar($genero);
 
         $descripcion = trim((string) ($volumeInfo['description'] ?? ''));
         if ($descripcion === '') {
@@ -163,6 +161,7 @@ final class ServicioCatalogoLibros
                 $descripcion = trim(strip_tags((string) ($searchInfo['textSnippet'] ?? '')));
             }
         }
+        $descripcion = $this->limpiarDescripcionEspanol($descripcion);
 
         $imageLinks = $volumeInfo['imageLinks'] ?? [];
         $portada = null;
@@ -184,5 +183,54 @@ final class ServicioCatalogoLibros
             'descripcion' => $descripcion !== '' ? $descripcion : null,
             'portada_url' => $portada,
         ];
+    }
+
+    private function limpiarDescripcionEspanol(string $descripcion): string
+    {
+        $descripcion = trim($descripcion);
+        if ($descripcion === '') {
+            return '';
+        }
+
+        if (preg_match('/\b(ENGLISH DESCRIPTION|DESCRIPTION IN ENGLISH|ENGLISH VERSION)\b/i', $descripcion, $match, PREG_OFFSET_CAPTURE)) {
+            $offset = (int) ($match[0][1] ?? 0);
+            $descripcion = trim(substr($descripcion, 0, $offset));
+        }
+
+        $bloques = preg_split('/\n{2,}/', $descripcion) ?: [];
+        $bloques = array_values(array_filter(array_map(static fn (string $texto): string => trim($texto), $bloques), static fn (string $texto): bool => $texto !== ''));
+
+        while (count($bloques) > 1 && $this->pareceTextoEnIngles($bloques[count($bloques) - 1])) {
+            array_pop($bloques);
+        }
+
+        return trim(implode("\n\n", $bloques));
+    }
+
+    private function pareceTextoEnIngles(string $texto): bool
+    {
+        $palabras = preg_split('/[^a-z]+/i', mb_strtolower($texto, 'UTF-8')) ?: [];
+        $palabras = array_values(array_filter($palabras, static fn (string $palabra): bool => $palabra !== ''));
+
+        if (count($palabras) < 12) {
+            return false;
+        }
+
+        $comunes = [
+            'the', 'and', 'with', 'that', 'this', 'from', 'into', 'your', 'their', 'about', 'over',
+            'under', 'have', 'has', 'been', 'will', 'would', 'could', 'should', 'first', 'before',
+            'until', 'where', 'when', 'then', 'while', 'is', 'are', 'was', 'were', 'to', 'of', 'in',
+            'on', 'for', 'as', 'at', 'by', 'it', 'its', 'he', 'she', 'they', 'him', 'her', 'them',
+        ];
+        $diccionario = array_flip($comunes);
+
+        $coincidencias = 0;
+        foreach ($palabras as $palabra) {
+            if (isset($diccionario[$palabra])) {
+                $coincidencias++;
+            }
+        }
+
+        return $coincidencias >= 6 || ($coincidencias / count($palabras)) >= 0.22;
     }
 }

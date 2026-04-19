@@ -6,6 +6,7 @@ namespace Fabularia\Controladores;
 
 use Fabularia\Http\SolicitudHttp;
 use Fabularia\Repositorios\RepositorioLibros;
+use Fabularia\Servicios\NormalizadorGeneroLibros;
 use Monolog\Logger;
 
 final class ControladorLibros
@@ -27,6 +28,7 @@ final class ControladorLibros
         $titulo = SolicitudHttp::obtenerTexto($datos, 'titulo');
         $autor = SolicitudHttp::obtenerTexto($datos, 'autor');
         $genero = SolicitudHttp::obtenerTexto($datos, 'genero');
+        $genero = NormalizadorGeneroLibros::normalizarParaGuardar($genero);
         $portadaUrl = SolicitudHttp::obtenerTexto($datos, 'portada_url');
         $portadaUrl = $portadaUrl === '' ? null : $portadaUrl;
         $descripcion = SolicitudHttp::obtenerTexto($datos, 'descripcion');
@@ -76,6 +78,10 @@ final class ControladorLibros
         $idUsuarioActual = $idUsuarioActual > 0 ? $idUsuarioActual : null;
 
         $libros = $this->repositorioLibros->listarDisponibles($terminoBusqueda, $genero, $idUsuarioActual);
+        foreach ($libros as &$libro) {
+            $libro['genero'] = NormalizadorGeneroLibros::normalizarParaGuardar((string) ($libro['genero'] ?? ''));
+        }
+        unset($libro);
         return [200, ['libros' => $libros]];
     }
 
@@ -86,6 +92,10 @@ final class ControladorLibros
     {
         $idUsuario = (int) ($_SESSION['id_usuario'] ?? 0);
         $libros = $this->repositorioLibros->listarPorUsuario($idUsuario);
+        foreach ($libros as &$libro) {
+            $libro['genero'] = NormalizadorGeneroLibros::normalizarParaGuardar((string) ($libro['genero'] ?? ''));
+        }
+        unset($libro);
         return [200, ['libros' => $libros]];
     }
 
