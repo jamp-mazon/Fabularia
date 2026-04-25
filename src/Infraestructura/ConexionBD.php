@@ -20,20 +20,28 @@ final class ConexionBD
 
         $dsn = "mysql:host={$host};port={$puerto};dbname={$nombreBase};charset=utf8mb4";
 
+        $opciones = [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES => false,
+        ];
+
+        // Inyección de TLS si las variables están presentes
+        if (isset($_ENV['DB_SSL_CA'])) {
+            $opciones[PDO::MYSQL_ATTR_SSL_CA] = $_ENV['DB_SSL_CA'];
+            $opciones[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = true;
+
+            if (isset($_ENV['DB_SSL_CERT'], $_ENV['DB_SSL_KEY'])) {
+                $opciones[PDO::MYSQL_ATTR_SSL_CERT] = $_ENV['DB_SSL_CERT'];
+                $opciones[PDO::MYSQL_ATTR_SSL_KEY] = $_ENV['DB_SSL_KEY'];
+            }
+        }
+
         try {
-            return new PDO(
-                $dsn,
-                $usuario,
-                $contrasena,
-                [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    PDO::ATTR_EMULATE_PREPARES => false,
-                ]
-            );
+            return new PDO($dsn, $usuario, $contrasena, $opciones);
         } catch (PDOException $excepcion) {
             throw new RuntimeException(
-                'No se pudo conectar con la base de datos. Revisa el archivo .env.',
+                'No se pudo conectar con la base de datos. Revisa la configuración TLS/Env.',
                 0,
                 $excepcion
             );
