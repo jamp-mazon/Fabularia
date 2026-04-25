@@ -13,6 +13,7 @@ use Fabularia\Repositorios\RepositorioLibros;
 use Fabularia\Repositorios\RepositorioPrestamos;
 use Fabularia\Repositorios\RepositorioUsuarios;
 use Fabularia\Servicios\ServicioCatalogoLibros;
+use Fabularia\Servicios\ServicioCorreo;
 use Fabularia\Servicios\ServicioWebhookPrestamos;
 
 $contenedor = require __DIR__ . '/../config/bootstrap.php';
@@ -22,30 +23,6 @@ $logger = $contenedor['logger'];
 $repositorioUsuarios = new RepositorioUsuarios($pdo);
 $repositorioLibros = new RepositorioLibros($pdo);
 $repositorioPrestamos = new RepositorioPrestamos($pdo);
-$servicioCatalogoLibros = new ServicioCatalogoLibros(
-    $logger,
-    (string) ($_ENV['GOOGLE_BOOKS_API_KEY'] ?? '')
-);
-$servicioWebhookPrestamos = new ServicioWebhookPrestamos(
-    $logger,
-    (string) ($_ENV['N8N_WEBHOOK_PRESTAMO'] ?? 'https://n8n.example/webhook-test/REDACTED')
-);
-
-$controladorUsuarios = new ControladorUsuarios($repositorioUsuarios, $logger);
-$controladorLibros = new ControladorLibros($repositorioLibros, $logger);
-$controladorCatalogoLibros = new ControladorCatalogoLibros($servicioCatalogoLibros);
-$controladorTelegram = new ControladorTelegram(
-    $repositorioUsuarios,
-    $logger,
-    (string) ($_ENV['TELEGRAM_VINCULACION_TOKEN'] ?? '')
-);
-$controladorPrestamos = new ControladorPrestamos(
-    $repositorioPrestamos,
-    $repositorioLibros,
-    $repositorioUsuarios,
-    $servicioWebhookPrestamos,
-    $logger
-);
 
 /**
  * Normaliza la ruta teniendo en cuenta que en Apache/XAMPP puede existir un prefijo
@@ -95,13 +72,65 @@ function redirigir(string $basePublica, string $destinoRelativo): never
     exit;
 }
 
+function obtenerUrlBaseAplicacion(string $basePublica): string
+{
+    $urlEntorno = trim((string) ($_ENV['APP_URL_BASE'] ?? ''));
+    if ($urlEntorno !== '') {
+        return rtrim($urlEntorno, '/');
+    }
+
+    $https = (string) ($_SERVER['HTTPS'] ?? '');
+    $esHttps = $https !== '' && strtolower($https) !== 'off';
+    $protocolo = $esHttps ? 'https' : 'http';
+    $host = trim((string) ($_SERVER['HTTP_HOST'] ?? 'localhost'));
+
+    return rtrim($protocolo . '://' . $host . $basePublica, '/');
+}
+
 $metodoHttp = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
 $rutaBruta = (string) (parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/');
 $ruta = normalizarRutaSolicitada($rutaBruta, $_SERVER['SCRIPT_NAME'] ?? '/index.php');
 $basePublica = obtenerBasePublica($_SERVER['SCRIPT_NAME'] ?? '/index.php');
 $urlBaseApi = $basePublica . '/api';
+$urlBaseAplicacion = obtenerUrlBaseAplicacion($basePublica);
 $urlBaseTelegramBot = (string) ($_ENV['TELEGRAM_BOT_URL_BASE'] ?? 'https://t.me/Fabularia_bot?start=');
 $autenticado = !empty($_SESSION['id_usuario']);
+
+$servicioCatalogoLibros = new ServicioCatalogoLibros(
+    $logger,
+    (string) ($_ENV['GOOGLE_BOOKS_API_KEY'] ?? '')
+);
+$servicioWebhookPrestamos = new ServicioWebhookPrestamos(
+    $logger,
+    (string) ($_ENV['N8N_WEBHOOK_PRESTAMO'] ?? 'https://n8n.example/webhook-test/REDACTED')
+);
+$servicioCorreo = new ServicioCorreo(
+    $logger,
+    (string) ($_ENV['MAIL_FROM_EMAIL'] ?? ''),
+    (string) ($_ENV['MAIL_FROM_NAME'] ?? 'Fabularia')
+);
+
+$controladorUsuarios = new ControladorUsuarios(
+    $repositorioUsuarios,
+    $servicioCorreo,
+    $logger,
+    $urlBaseAplicacion,
+    (int) ($_ENV['PASSWORD_RESET_TTL_MINUTES'] ?? 30)
+);
+$controladorLibros = new ControladorLibros($repositorioLibros, $logger);
+$controladorCatalogoLibros = new ControladorCatalogoLibros($servicioCatalogoLibros);
+$controladorTelegram = new ControladorTelegram(
+    $repositorioUsuarios,
+    $logger,
+    (string) ($_ENV['TELEGRAM_VINCULACION_TOKEN'] ?? '')
+);
+$controladorPrestamos = new ControladorPrestamos(
+    $repositorioPrestamos,
+    $repositorioLibros,
+    $repositorioUsuarios,
+    $servicioWebhookPrestamos,
+    $logger
+);
 
 if ($metodoHttp === 'GET' && !str_starts_with($ruta, '/api/')) {
     if ($ruta === '/') {
@@ -124,6 +153,22 @@ if ($metodoHttp === 'GET' && !str_starts_with($ruta, '/api/')) {
         exit;
     }
 
+    if ($ruta === '/recuperar-contrasena') {
+        if ($autenticado) {
+            redirigir($basePublica, '/app');
+        }
+        require __DIR__ . '/vistas/recuperar_contrasena.php';
+        exit;
+    }
+
+    if ($ruta === '/restablecer-contrasena') {
+        if ($autenticado) {
+            redirigir($basePublica, '/app');
+        }
+        require __DIR__ . '/vistas/restablecer_contrasena.php';
+        exit;
+    }
+
     if ($ruta === '/app') {
         if (!$autenticado) {
             redirigir($basePublica, '/login');
@@ -139,6 +184,8 @@ $enrutador->registrar('GET', '/api/estado', static fn (): array => [200, ['estad
 $enrutador->registrar('POST', '/api/usuarios/registro', static fn () => $controladorUsuarios->registrar());
 $enrutador->registrar('POST', '/api/usuarios/login', static fn () => $controladorUsuarios->iniciarSesion());
 $enrutador->registrar('POST', '/api/usuarios/logout', static fn () => $controladorUsuarios->cerrarSesion(), true);
+$enrutador->registrar('POST', '/api/usuarios/solicitar-restablecimiento', static fn () => $controladorUsuarios->solicitarRestablecimientoContrasena());
+$enrutador->registrar('POST', '/api/usuarios/restablecer-contrasena', static fn () => $controladorUsuarios->restablecerContrasenaConToken());
 $enrutador->registrar('GET', '/api/usuarios/yo', static fn () => $controladorUsuarios->usuarioActual());
 $enrutador->registrar('POST', '/api/usuarios/telefono', static fn () => $controladorUsuarios->actualizarTelefono(), true);
 $enrutador->registrar('POST', '/api/usuarios/cambiar-contrasena', static fn () => $controladorUsuarios->cambiarContrasena(), true);

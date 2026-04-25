@@ -138,6 +138,14 @@ a:hover {
     margin: 0 auto;
 }
 
+.auth-layout--registro {
+    align-items: start;
+}
+
+.auth-layout--registro .info-card {
+    height: fit-content;
+}
+
 .info-card {
     padding: 1.7rem;
     position: relative;
@@ -204,6 +212,94 @@ input, textarea, button {
     border: 1px solid #cfd8e4;
     padding: 0.65rem 0.75rem;
     font: inherit;
+}
+
+.campo-contrasena {
+    position: relative;
+}
+
+.campo-contrasena input {
+    padding-right: 2.9rem;
+}
+
+.toggle-contrasena {
+    position: absolute;
+    right: 0.35rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    padding: 0;
+    border: 1px solid #cfd8e4;
+    border-radius: 9px;
+    background: #fff;
+    color: #243047;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.toggle-contrasena:hover {
+    transform: translateY(-50%);
+    filter: none;
+    background: #f4f8ff;
+}
+
+.fortaleza {
+    margin-top: 0.45rem;
+}
+
+.fortaleza-barra {
+    width: 100%;
+    height: 8px;
+    border-radius: 999px;
+    background: #e3e8f1;
+    overflow: hidden;
+}
+
+.fortaleza-progreso {
+    height: 100%;
+    width: 0%;
+    border-radius: inherit;
+    transition: width 0.2s ease, background-color 0.2s ease;
+    background: #c83a3a;
+}
+
+.fortaleza-progreso.debil {
+    background: #c83a3a;
+}
+
+.fortaleza-progreso.media {
+    background: #d58a14;
+}
+
+.fortaleza-progreso.fuerte {
+    background: #0f766e;
+}
+
+.fortaleza-texto {
+    margin-top: 0.26rem;
+    font-size: 0.82rem;
+    color: var(--muted);
+}
+
+.auth-enlaces {
+    margin-top: 0.8rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+}
+
+.auth-enlaces--stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
 }
 
 textarea {
