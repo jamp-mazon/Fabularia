@@ -39,9 +39,9 @@ cp .env.example .env
    Configura tambien:
 
 ```dotenv
-N8N_WEBHOOK_PRESTAMO=https://n8n.example/webhook-test/REDACTED
-TELEGRAM_BOT_URL_BASE=https://t.me/Fabularia_bot?start=
-TELEGRAM_VINCULACION_TOKEN=cambia_este_token_compartido_con_n8n
+N8N_WEBHOOK_PRESTAMO=
+TELEGRAM_BOT_URL_BASE=
+TELEGRAM_VINCULACION_TOKEN=
 GOOGLE_BOOKS_API_KEY=
 ```
 
