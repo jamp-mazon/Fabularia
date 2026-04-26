@@ -14,7 +14,7 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Fabularia | Aplicacion</title>
+    <title>Fabularia | Aplicación</title>
     <link rel="stylesheet" href="<?= htmlspecialchars($urlCss, ENT_QUOTES) ?>">
     <link rel="icon" type="image/png" href="<?= htmlspecialchars($urlLogo, ENT_QUOTES) ?>">
 </head>
@@ -32,18 +32,18 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         <div class="fila-botones fila-botones--cabecera">
             <div class="acceso-usuario">
                 <p class="bienvenida-inline"><span>Bienvenido,</span> <strong id="nombreUsuarioActivo">-</strong></p>
-                <button id="botonCerrarSesionRapido" type="button">Cerrar sesion</button>
+                <button id="botonCerrarSesionRapido" type="button">Cerrar sesión</button>
             </div>
             <div id="mensaje" class="mensaje mensaje--inline"></div>
         </div>
     </header>
 
     <section class="tarjeta panel-card app-main app-main--principal">
-        <nav class="tab-nav" aria-label="Secciones de aplicacion">
+        <nav class="tab-nav" aria-label="Secciones de aplicación">
                 <button type="button" class="tab-btn tab-btn--activa" data-tab="catalogo">Cat&aacute;logo</button>
                 <button type="button" class="tab-btn" data-tab="publicar">Publicar</button>
                 <button type="button" class="tab-btn" data-tab="mis-libros">Mis libros</button>
-                <button type="button" class="tab-btn" data-tab="prestamos">Prestamos</button>
+                <button type="button" class="tab-btn" data-tab="prestamos">Préstamos</button>
                 <button type="button" class="tab-btn tab-btn--icono" data-tab="ajustes" aria-label="Ajustes">
                     <span class="icono-ajustes-emoji" aria-hidden="true">&#9881;</span>
                     <span>Ajustes</span>
@@ -53,7 +53,7 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
             <section class="tab-panel tab-panel--activo" data-panel="catalogo">
                 <article class="subcard catalogo-panel">
                     <h3>Cat&aacute;logo</h3>
-                    <div class="catalogo-vistas-nav" role="tablist" aria-label="Tipo de catalogo">
+                    <div class="catalogo-vistas-nav" role="tablist" aria-label="Tipo de catálogo">
                         <button id="botonVistaCatalogoUsuarios" type="button" class="catalogo-vista-btn catalogo-vista-btn--activa" data-catalogo-vista="usuarios">Libros de usuarios</button>
                         <button id="botonVistaCatalogoLibres" type="button" class="catalogo-vista-btn" data-catalogo-vista="libres">Libros gratuitos</button>
                     </div>
@@ -62,12 +62,12 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
                         <form id="formularioBusquedaUsuarios" class="catalogo-filtros">
                             <div class="catalogo-filtro-grupo">
                                 <label for="busquedaTextoUsuarios">T&iacute;tulo o autor</label>
-                                <input id="busquedaTextoUsuarios" name="buscar" placeholder="Busca por titulo o autor...">
+                                <input id="busquedaTextoUsuarios" name="buscar" placeholder="Busca por título o autor...">
                             </div>
 
                             <div class="catalogo-filtro-grupo">
-                                <label for="busquedaGeneroUsuarios">Genero</label>
-                                <input id="busquedaGeneroUsuarios" name="genero" placeholder="Fantasia, novela, poesia...">
+                                <label for="busquedaGeneroUsuarios">Género</label>
+                                <input id="busquedaGeneroUsuarios" name="genero" placeholder="Fantasía, novela, poesía...">
                             </div>
 
                             <button type="submit">Buscar</button>
@@ -82,6 +82,11 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
                             <div class="catalogo-filtro-grupo">
                                 <label for="busquedaTextoLibres">T&iacute;tulo o autor</label>
                                 <input id="busquedaTextoLibres" name="texto" placeholder="Busca libros de dominio p&uacute;blico...">
+                            </div>
+
+                            <div class="catalogo-filtro-grupo">
+                                <label for="busquedaGeneroLibres">G&eacute;nero</label>
+                                <input id="busquedaGeneroLibres" name="genero" placeholder="Novela, historia, aventuras...">
                             </div>
 
                             <button type="submit">Buscar</button>
@@ -132,14 +137,14 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
                         <label for="libroAutor">Autor</label>
                         <input id="libroAutor" name="autor" required>
 
-                        <label for="libroGenero">Genero</label>
-                        <input id="libroGenero" name="genero" placeholder="Novela, poesia, ciencia..." required>
+                        <label for="libroGenero">Género</label>
+                        <input id="libroGenero" name="genero" placeholder="Novela, poesía, ciencia..." required>
 
                         <label for="libroPortada">Portada (URL, opcional)</label>
                         <input id="libroPortada" name="portada_url" type="url" placeholder="https://...">
 
-                        <label for="libroDescripcion">Descripcion</label>
-                        <textarea id="libroDescripcion" name="descripcion" placeholder="Estado del libro, edicion, etc."></textarea>
+                        <label for="libroDescripcion">Descripción</label>
+                        <textarea id="libroDescripcion" name="descripcion" placeholder="Estado del libro, edición, etc."></textarea>
 
                         <button type="submit" style="margin-top:0.8rem;">Guardar libro</button>
                     </form>
@@ -153,13 +158,17 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
                         <h4>Continuar lectura</h4>
                         <ul id="listaContinuarLectura" class="lista lista-continuar-lectura"></ul>
                     </section>
+                    <section class="subseccion-lectura">
+                        <h4 id="tituloSeccionMisLibros">Mis libros para prestar</h4>
+                        <p id="estadoSeccionMisLibros" class="pequeno">Disponibles: 0 | Prestados: 0</p>
+                    </section>
                     <ul id="listaMisLibros" class="lista"></ul>
                 </article>
             </section>
 
             <section class="tab-panel" data-panel="prestamos">
                 <article class="subcard subcard--compacta">
-                    <h3>Mis prestamos</h3>
+                    <h3>Mis préstamos</h3>
                     <ul id="listaMisPrestamos" class="lista"></ul>
                 </article>
             </section>
@@ -169,7 +178,7 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
                     <article class="subcard">
                         <h3>Telegram</h3>
                         <p id="estadoTelegramAjustes" class="estado-telegram estado-telegram--pendiente">Telegram no vinculado</p>
-                        <p id="textoTelegramUsuario" class="pequeno">Vincula tu cuenta para recibir avisos de prestamos.</p>
+                        <p id="textoTelegramUsuario" class="pequeno">Vincula tu cuenta para recibir avisos de préstamos.</p>
 
                         <div class="fila-botones ajustes-botones">
                             <a id="enlaceTelegramAjustes" class="telegram-link telegram-link--boton" href="#" target="_blank" rel="noopener noreferrer">
@@ -307,6 +316,8 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
     const listaLibrosDisponibles = document.getElementById("listaLibrosDisponibles");
     const bloqueContinuarLectura = document.getElementById("bloqueContinuarLectura");
     const listaContinuarLectura = document.getElementById("listaContinuarLectura");
+    const tituloSeccionMisLibros = document.getElementById("tituloSeccionMisLibros");
+    const estadoSeccionMisLibros = document.getElementById("estadoSeccionMisLibros");
     const modalDetalleLibro = document.getElementById("modalDetalleLibro");
     const cerrarDetalleLibro = document.getElementById("cerrarDetalleLibro");
     const detalleLibroPortada = document.getElementById("detalleLibroPortada");
@@ -343,9 +354,11 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
     let haySiguienteLibresEs = false;
     let haySiguienteLibresEn = false;
     let textoBusquedaLibresActual = "";
+    let generoBusquedaLibresActual = "";
     let catalogoLibreInicializado = false;
     let animacionCargaCatalogoLibres = null;
     const cacheCatalogoLibre = new Map();
+    const solicitudesCatalogoLibrePendientes = new Map();
 
     function escaparHtml(texto) {
         return String(texto ?? "")
@@ -382,8 +395,10 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         mensaje.textContent = "";
     }
 
-    function claveCacheCatalogoLibre(texto, paginaEs, paginaEn) {
-        return `${String(texto || "").trim().toLowerCase()}|es:${paginaEs}|en:${paginaEn}`;
+    function claveCacheCatalogoLibre(texto, genero, paginaEs, paginaEn) {
+        const claveTexto = String(texto || "").trim().toLowerCase();
+        const claveGenero = String(genero || "").trim().toLowerCase();
+        return `${claveTexto}|${claveGenero}|es:${paginaEs}|en:${paginaEn}`;
     }
 
     function iniciarAnimacionCargaCatalogoLibres(baseTexto = "Cargando cat\u00E1logo gratuito") {
@@ -400,6 +415,41 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         if (animacionCargaCatalogoLibres !== null) {
             clearInterval(animacionCargaCatalogoLibres);
             animacionCargaCatalogoLibres = null;
+        }
+    }
+
+    async function solicitarCatalogoLibreApi(consulta, claveCache) {
+        if (solicitudesCatalogoLibrePendientes.has(claveCache)) {
+            return solicitudesCatalogoLibrePendientes.get(claveCache);
+        }
+
+        const promesa = window.fabularia.llamarApi(`/catalogo/libre${consulta}`)
+            .finally(() => {
+                solicitudesCatalogoLibrePendientes.delete(claveCache);
+            });
+
+        solicitudesCatalogoLibrePendientes.set(claveCache, promesa);
+        return promesa;
+    }
+
+    async function precargarCatalogoLibre(texto, genero, paginaEs, paginaEn) {
+        const parametros = new URLSearchParams();
+        if (texto) parametros.set("texto", texto);
+        if (genero) parametros.set("genero", genero);
+        parametros.set("pagina_es", String(Math.max(1, paginaEs)));
+        parametros.set("pagina_en", String(Math.max(1, paginaEn)));
+        const consulta = `?${parametros.toString()}`;
+        const clave = claveCacheCatalogoLibre(texto, genero, paginaEs, paginaEn);
+
+        if (cacheCatalogoLibre.has(clave) || solicitudesCatalogoLibrePendientes.has(clave)) {
+            return;
+        }
+
+        try {
+            const datos = await solicitarCatalogoLibreApi(consulta, clave);
+            cacheCatalogoLibre.set(clave, datos);
+        } catch {
+            // Precarga opcional: no interrumpe la UI.
         }
     }
 
@@ -424,7 +474,7 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         vistaCatalogoLibres.hidden = mostrarUsuarios;
 
         if (!mostrarUsuarios && !catalogoLibreInicializado) {
-            void cargarLibrosCatalogoLibre(textoBusquedaLibresActual, { reiniciarPaginacion: true }).catch((error) => {
+            void cargarLibrosCatalogoLibre(textoBusquedaLibresActual, generoBusquedaLibresActual, { reiniciarPaginacion: true }).catch((error) => {
                 mostrarMensaje(error.message, "error");
             });
         }
@@ -926,7 +976,7 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
 
         detalleLibroPortada.innerHTML = bloquePortada(libro);
         detalleLibroTitulo.textContent = `${libro.titulo} - ${libro.autor}`;
-        detalleLibroMeta.textContent = `Genero: ${libro.genero || "Sin genero"}`;
+        detalleLibroMeta.textContent = `Género: ${libro.genero || "Sin género"}`;
         detalleLibroPropietario.textContent = `Propietario: ${libro.propietario || "No disponible"}`;
         const descripcion = soloDescripcionEspanol(libro.descripcion || "");
         detalleLibroDescripcion.textContent = descripcion || "Sin descripcion disponible.";
@@ -951,7 +1001,8 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         detalleLibroTitulo.textContent = `${libro.titulo} - ${libro.autor}`;
         const idioma = String(libro.idioma || "es").toLowerCase();
         const etiquetaIdioma = idioma === "en" ? "EN" : "ES";
-        detalleLibroMeta.textContent = `Género: Dominio público | Idioma: ${etiquetaIdioma}`;
+        const generoLibro = String(libro.genero || "Dominio público");
+        detalleLibroMeta.textContent = `Género: ${generoLibro} | Idioma: ${etiquetaIdioma}`;
         detalleLibroPropietario.textContent = "Catálogo gratuito (sin préstamo entre usuarios).";
         const descripcion = limpiarDescripcionCatalogoLibre(libro.descripcion || "", idioma);
         detalleLibroDescripcion.textContent = descripcion || "Sin descripcion disponible.";
@@ -975,8 +1026,8 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         const activo = prestamo.fecha_devolucion === null;
         detalleLibroPortada.innerHTML = bloquePortada(prestamo);
         detalleLibroTitulo.textContent = `${prestamo.titulo} - ${prestamo.autor}`;
-        detalleLibroMeta.textContent = `Genero: ${prestamo.genero || "Sin genero"}`;
-        detalleLibroPropietario.textContent = `Dueno: ${prestamo.nombre_dueno || "No disponible"} | Prestado: ${prestamo.fecha_prestamo || "-"}`;
+        detalleLibroMeta.textContent = `Género: ${prestamo.genero || "Sin género"}`;
+        detalleLibroPropietario.textContent = `Dueño: ${prestamo.nombre_dueno || "No disponible"} | Prestado: ${prestamo.fecha_prestamo || "-"}`;
         const descripcion = soloDescripcionEspanol(prestamo.descripcion || "");
         detalleLibroDescripcion.textContent = descripcion || "Sin descripcion disponible.";
         botonSolicitarDetalle.dataset.modo = "prestamo";
@@ -1063,8 +1114,9 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
 
         const idioma = String(libro.idioma || "es").toLowerCase();
         const idiomaEtiqueta = idioma === "en" ? "EN" : "ES";
+        const generoLibro = String(libro.genero || "Dominio p\u00FAblico");
         const avisoIdioma = idioma === "en"
-            ? `<span class="catalogo-idioma-badge catalogo-idioma-badge--en">EN (texto en inglés)</span>`
+            ? `<span class="catalogo-idioma-badge catalogo-idioma-badge--en">EN (texto en ingl\u00E9s)</span>`
             : `<span class="catalogo-idioma-badge">ES</span>`;
         const resumen = recortarDescripcionCatalogoLibre(libro.descripcion || "", idioma, 170);
 
@@ -1079,7 +1131,7 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
                     ${escaparHtml(libro.titulo)}
                 </button>
                 <p class="pequeno">Autor: ${escaparHtml(libro.autor)}</p>
-                <p class="pequeno">Género: Dominio público</p>
+                <p class="pequeno">G\u00E9nero: ${escaparHtml(generoLibro)}</p>
                 <p class="pequeno">Idioma: ${idiomaEtiqueta} ${avisoIdioma}</p>
                 <p class="catalogo-descripcion">${escaparHtml(resumen || "Sin descripcion disponible.")}</p>
                 <div class="catalogo-card-acciones">
@@ -1093,8 +1145,8 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
     }
 
     function actualizarPaginacionCatalogoLibre() {
-        paginacionLibresEsInfo.textContent = `Página ${paginaLibresEsActual}`;
-        paginacionLibresEnInfo.textContent = `Página ${paginaLibresEnActual}`;
+        paginacionLibresEsInfo.textContent = `P\u00E1gina ${paginaLibresEsActual}`;
+        paginacionLibresEnInfo.textContent = `P\u00E1gina ${paginaLibresEnActual}`;
         botonLibresEsAnterior.disabled = paginaLibresEsActual <= 1;
         botonLibresEnAnterior.disabled = paginaLibresEnActual <= 1;
         botonLibresEsSiguiente.disabled = !haySiguienteLibresEs;
@@ -1137,8 +1189,8 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
 
         if (librosEs.length === 0 && librosEn.length === 0) {
             estadoResultadosCatalogoLibres.textContent = "No hay resultados en el catalogo gratuito con ese texto.";
-            listaLibrosLibresEs.innerHTML = "<li class='catalogo-vacio'>No hay libros en español para ese filtro.</li>";
-            listaLibrosLibresEn.innerHTML = "<li class='catalogo-vacio'>No hay libros en inglés para ese filtro.</li>";
+            listaLibrosLibresEs.innerHTML = "<li class='catalogo-vacio'>No hay libros en espa\u00F1ol para ese filtro.</li>";
+            listaLibrosLibresEn.innerHTML = "<li class='catalogo-vacio'>No hay libros en ingl\u00E9s para ese filtro.</li>";
             actualizarPaginacionCatalogoLibre();
             return;
         }
@@ -1151,10 +1203,10 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
             librosCatalogoLibrePorId.set(idExterno, libro);
         }
 
-        estadoResultadosCatalogoLibres.textContent = `Mostrando ${librosEs.length} libro(s) en español (página ${paginaLibresEsActual}) y ${librosEn.length} en inglés (página ${paginaLibresEnActual}).`;
+        estadoResultadosCatalogoLibres.textContent = `Mostrando ${librosEs.length} libro(s) en espa\u00F1ol (p\u00E1gina ${paginaLibresEsActual}) y ${librosEn.length} en ingl\u00E9s (p\u00E1gina ${paginaLibresEnActual}).`;
 
         if (librosEs.length === 0) {
-            listaLibrosLibresEs.innerHTML = "<li class='catalogo-vacio'>No hay libros en español para ese filtro.</li>";
+            listaLibrosLibresEs.innerHTML = "<li class='catalogo-vacio'>No hay libros en espa\u00F1ol para ese filtro.</li>";
         } else {
             for (const libro of librosEs) {
                 listaLibrosLibresEs.appendChild(crearElementoLibroLibre(libro));
@@ -1162,7 +1214,7 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         }
 
         if (librosEn.length === 0) {
-            listaLibrosLibresEn.innerHTML = "<li class='catalogo-vacio'>No hay libros en inglés para ese filtro.</li>";
+            listaLibrosLibresEn.innerHTML = "<li class='catalogo-vacio'>No hay libros en ingl\u00E9s para ese filtro.</li>";
         } else {
             for (const libro of librosEn) {
                 listaLibrosLibresEn.appendChild(crearElementoLibroLibre(libro));
@@ -1170,10 +1222,21 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         }
 
         actualizarPaginacionCatalogoLibre();
+        if (haySiguienteLibresEs) {
+            void precargarCatalogoLibre(textoBusquedaLibresActual, generoBusquedaLibresActual, paginaLibresEsActual + 1, paginaLibresEnActual);
+        }
+        if (haySiguienteLibresEn) {
+            void precargarCatalogoLibre(textoBusquedaLibresActual, generoBusquedaLibresActual, paginaLibresEsActual, paginaLibresEnActual + 1);
+        }
     }
     function renderizarMisLibros(libros) {
         const lista = document.getElementById("listaMisLibros");
         lista.innerHTML = "";
+        const cantidadDisponibles = libros.filter((libro) => Number(libro.disponible) === 1).length;
+        const cantidadPrestados = Math.max(0, libros.length - cantidadDisponibles);
+        tituloSeccionMisLibros.textContent = "Mis libros para prestar y prestados";
+        estadoSeccionMisLibros.textContent = `Disponibles: ${cantidadDisponibles} | Prestados: ${cantidadPrestados}`;
+
         if (!libros.length) {
             lista.innerHTML = "<li>No has publicado libros todavia.</li>";
             renderizarContinuarLectura();
@@ -1348,7 +1411,7 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         renderizarLibrosDisponibles(datos.libros || []);
     }
 
-    async function cargarLibrosCatalogoLibre(texto = "", opciones = {}) {
+    async function cargarLibrosCatalogoLibre(texto = "", genero = "", opciones = {}) {
         const reiniciarPaginacion = Boolean(opciones.reiniciarPaginacion);
         const forzarRecarga = Boolean(opciones.forzarRecarga);
         if (reiniciarPaginacion) {
@@ -1359,16 +1422,23 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         if (typeof texto === "string") {
             textoBusquedaLibresActual = texto.trim();
         }
+        if (typeof genero === "string") {
+            generoBusquedaLibresActual = genero.trim();
+        }
 
         const parametros = new URLSearchParams();
         if (textoBusquedaLibresActual !== "") {
             parametros.set("texto", textoBusquedaLibresActual);
+        }
+        if (generoBusquedaLibresActual !== "") {
+            parametros.set("genero", generoBusquedaLibresActual);
         }
         parametros.set("pagina_es", String(paginaLibresEsActual));
         parametros.set("pagina_en", String(paginaLibresEnActual));
         const consulta = parametros.toString() ? `?${parametros.toString()}` : "";
         const claveCache = claveCacheCatalogoLibre(
             textoBusquedaLibresActual,
+            generoBusquedaLibresActual,
             paginaLibresEsActual,
             paginaLibresEnActual
         );
@@ -1381,7 +1451,7 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
 
         iniciarAnimacionCargaCatalogoLibres();
         try {
-            const datos = await window.fabularia.llamarApi(`/catalogo/libre${consulta}`);
+            const datos = await solicitarCatalogoLibreApi(consulta, claveCache);
             cacheCatalogoLibre.set(claveCache, datos);
             renderizarLibrosLibres(datos);
             catalogoLibreInicializado = true;
@@ -1408,7 +1478,7 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         }
 
         try {
-            await cargarLibrosCatalogoLibre(textoBusquedaLibresActual);
+            await cargarLibrosCatalogoLibre(textoBusquedaLibresActual, generoBusquedaLibresActual);
         } catch (error) {
             paginaLibresEsActual = paginaAnteriorEs;
             paginaLibresEnActual = paginaAnteriorEn;
@@ -1538,7 +1608,8 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         const texto = evento.currentTarget.texto.value.trim();
 
         try {
-            await cargarLibrosCatalogoLibre(texto, { reiniciarPaginacion: true });
+            const genero = evento.currentTarget.genero.value.trim();
+            await cargarLibrosCatalogoLibre(texto, genero, { reiniciarPaginacion: true });
         } catch (error) {
             mostrarMensaje(error.message, "error");
         }
@@ -1987,6 +2058,7 @@ document.getElementById("botonCerrarSesionRapido").addEventListener("click", asy
         try {
             await actualizarSesion();
             await cargarPanelCompleto();
+            void precargarCatalogoLibre("", "", 1, 1);
             activarVistaCatalogo("usuarios");
             activarTab("catalogo");
         } catch (error) {
@@ -1996,4 +2068,3 @@ document.getElementById("botonCerrarSesionRapido").addEventListener("click", asy
 </script>
 </body>
 </html>
-

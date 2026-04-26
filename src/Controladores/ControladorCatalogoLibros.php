@@ -37,6 +37,7 @@ final class ControladorCatalogoLibros
     public function catalogoLibre(): array
     {
         $texto = trim((string) ($_GET['texto'] ?? ''));
+        $genero = trim((string) ($_GET['genero'] ?? ''));
         $paginaEs = max(1, (int) ($_GET['pagina_es'] ?? 1));
         $paginaEn = max(1, (int) ($_GET['pagina_en'] ?? 1));
         $porPagina = 10;
@@ -45,17 +46,20 @@ final class ControladorCatalogoLibros
             $texto,
             'es',
             $paginaEs,
-            $porPagina
+            $porPagina,
+            $genero
         );
         $seccionEn = $this->servicioLecturaPublica->buscarLibrosCatalogoLibrePaginadoPorIdioma(
             $texto,
             'en',
             $paginaEn,
-            $porPagina
+            $porPagina,
+            $genero
         );
 
         return [200, [
             'texto' => $texto,
+            'genero' => $genero,
             'libros_es' => $seccionEs['libros'] ?? [],
             'libros_en' => $seccionEn['libros'] ?? [],
             'paginacion' => [

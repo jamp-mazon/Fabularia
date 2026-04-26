@@ -150,7 +150,8 @@ final class ServicioLecturaPublica
         string $textoBusqueda,
         string $idioma,
         int $pagina,
-        int $porPagina = 10
+        int $porPagina = 10,
+        string $filtroGenero = ''
     ): array {
         $idioma = trim(mb_strtolower($idioma, 'UTF-8'));
         if (!in_array($idioma, ['es', 'en'], true)) {
@@ -166,6 +167,7 @@ final class ServicioLecturaPublica
         $pagina = max(1, $pagina);
         $porPagina = max(1, min(20, $porPagina));
         $textoBusqueda = trim($textoBusqueda);
+        $filtroGenero = $this->normalizarTexto($filtroGenero);
 
         try {
             $baseUrl = 'https://gutendex.com/books?languages=' . rawurlencode($idioma);
@@ -207,6 +209,10 @@ final class ServicioLecturaPublica
                         continue;
                     }
 
+                    if (!$this->coincideGeneroCatalogoLibre($libro, $filtroGenero)) {
+                        continue;
+                    }
+
                     $idExterno = trim((string) ($libro['id_externo'] ?? ''));
                     if ($idExterno === '' || isset($idsVistos[$idExterno])) {
                         continue;
@@ -233,7 +239,13 @@ final class ServicioLecturaPublica
             }
 
             if (count($librosPagina) < $porPagina) {
-                $fallback = $this->obtenerFallbackPaginadoPorIdioma($textoBusqueda, $idioma, $pagina, $porPagina);
+                $fallback = $this->obtenerFallbackPaginadoPorIdioma(
+                    $textoBusqueda,
+                    $idioma,
+                    $pagina,
+                    $porPagina,
+                    $filtroGenero
+                );
                 foreach ($fallback['libros'] as $libroFallback) {
                     $idExterno = trim((string) ($libroFallback['id_externo'] ?? ''));
                     if ($idExterno === '' || isset($idsVistos[$idExterno])) {
@@ -264,7 +276,13 @@ final class ServicioLecturaPublica
                 'mensaje' => $excepcion->getMessage(),
             ]);
 
-            $fallback = $this->obtenerFallbackPaginadoPorIdioma($textoBusqueda, $idioma, $pagina, $porPagina);
+            $fallback = $this->obtenerFallbackPaginadoPorIdioma(
+                $textoBusqueda,
+                $idioma,
+                $pagina,
+                $porPagina,
+                $filtroGenero
+            );
             foreach ($fallback['libros'] as $libroFallback) {
                 $this->guardarReferenciaCatalogoLibreEnCache($libroFallback);
             }
@@ -496,15 +514,21 @@ final class ServicioLecturaPublica
     private function filtrarCatalogoLibreFallbackPorIdioma(
         string $textoBusqueda,
         string $idioma,
-        int $maxResultados
+        int $maxResultados,
+        string $filtroGenero = ''
     ): array {
         $texto = mb_strtolower(trim($textoBusqueda), 'UTF-8');
         $idioma = trim(mb_strtolower($idioma, 'UTF-8'));
+        $filtroGenero = $this->normalizarTexto($filtroGenero);
         $salida = [];
 
         foreach ($this->catalogoLibreFallback() as $libro) {
             $idiomaLibro = trim(mb_strtolower((string) ($libro['idioma'] ?? ''), 'UTF-8'));
             if ($idiomaLibro !== $idioma) {
+                continue;
+            }
+
+            if (!$this->coincideGeneroCatalogoLibre($libro, $filtroGenero)) {
                 continue;
             }
 
@@ -532,7 +556,8 @@ final class ServicioLecturaPublica
         string $textoBusqueda,
         string $idioma,
         int $pagina,
-        int $porPagina
+        int $porPagina,
+        string $filtroGenero = ''
     ): array {
         $pagina = max(1, $pagina);
         $porPagina = max(1, $porPagina);
@@ -540,7 +565,8 @@ final class ServicioLecturaPublica
         $filtrados = $this->filtrarCatalogoLibreFallbackPorIdioma(
             $textoBusqueda,
             $idioma,
-            500
+            500,
+            $filtroGenero
         );
 
         $offset = ($pagina - 1) * $porPagina;
@@ -564,6 +590,7 @@ final class ServicioLecturaPublica
                 'titulo' => 'Don Quijote de la Mancha',
                 'autor' => 'Miguel de Cervantes',
                 'genero' => 'Dominio publico',
+                'generos' => ['Ficcion', 'Clasicos', 'Novela picaresca'],
                 'descripcion' => 'Clasico de la literatura espanola sobre las aventuras de Alonso Quijano y su escudero Sancho Panza.',
                 'portada_url' => 'https://www.gutenberg.org/cache/epub/2000/pg2000.cover.medium.jpg',
                 'idioma' => 'es',
@@ -577,6 +604,7 @@ final class ServicioLecturaPublica
                 'titulo' => 'El crimen y el castigo',
                 'autor' => 'Fiodor Dostoievski',
                 'genero' => 'Dominio publico',
+                'generos' => ['Ficcion', 'Psicologica', 'Clasicos'],
                 'descripcion' => 'Novela psicologica sobre culpa, redencion y conflicto moral en la Rusia del siglo XIX.',
                 'portada_url' => 'https://www.gutenberg.org/cache/epub/61851/pg61851.cover.medium.jpg',
                 'idioma' => 'es',
@@ -590,6 +618,7 @@ final class ServicioLecturaPublica
                 'titulo' => 'La Odisea',
                 'autor' => 'Homero',
                 'genero' => 'Dominio publico',
+                'generos' => ['Epica', 'Clasicos', 'Mitologia'],
                 'descripcion' => 'Poema epico del regreso de Ulises tras la guerra de Troya, con viajes y desafios miticos.',
                 'portada_url' => 'https://www.gutenberg.org/cache/epub/58221/pg58221.cover.medium.jpg',
                 'idioma' => 'es',
@@ -603,6 +632,7 @@ final class ServicioLecturaPublica
                 'titulo' => 'Dona Perfecta',
                 'autor' => 'Benito Perez Galdos',
                 'genero' => 'Dominio publico',
+                'generos' => ['Ficcion', 'Literatura espanola', 'Clasicos'],
                 'descripcion' => 'Novela espanola sobre conflicto entre tradicion, religion y modernidad en la Espana del siglo XIX.',
                 'portada_url' => 'https://www.gutenberg.org/cache/epub/15725/pg15725.cover.medium.jpg',
                 'idioma' => 'es',
@@ -616,6 +646,7 @@ final class ServicioLecturaPublica
                 'titulo' => 'La Divina Comedia',
                 'autor' => 'Dante Alighieri',
                 'genero' => 'Dominio publico',
+                'generos' => ['Poesia', 'Epica', 'Clasicos'],
                 'descripcion' => 'Version en espanol del poema epico dividido en Infierno, Purgatorio y Paraiso.',
                 'portada_url' => 'https://www.gutenberg.org/cache/epub/57303/pg57303.cover.medium.jpg',
                 'idioma' => 'es',
@@ -629,6 +660,7 @@ final class ServicioLecturaPublica
                 'titulo' => 'Cuentos de amor',
                 'autor' => 'Horacio Quiroga',
                 'genero' => 'Dominio publico',
+                'generos' => ['Relatos', 'Ficcion', 'Cuentos'],
                 'descripcion' => 'Coleccion de relatos breves con tono intimista y dramatico del modernismo rioplatense.',
                 'portada_url' => 'https://www.gutenberg.org/cache/epub/55514/pg55514.cover.medium.jpg',
                 'idioma' => 'es',
@@ -642,6 +674,7 @@ final class ServicioLecturaPublica
                 'titulo' => 'Pride and Prejudice',
                 'autor' => 'Jane Austen',
                 'genero' => 'Dominio publico',
+                'generos' => ['Fiction', 'Classics', 'Romance'],
                 'descripcion' => 'Classic novel about social expectations, family pressures, and emotional growth in Regency England.',
                 'portada_url' => 'https://www.gutenberg.org/cache/epub/1342/pg1342.cover.medium.jpg',
                 'idioma' => 'en',
@@ -655,6 +688,7 @@ final class ServicioLecturaPublica
                 'titulo' => 'Frankenstein; Or, The Modern Prometheus',
                 'autor' => 'Mary Shelley',
                 'genero' => 'Dominio publico',
+                'generos' => ['Fiction', 'Gothic', 'Science fiction'],
                 'descripcion' => 'Foundational gothic science-fiction novel on ambition, responsibility, and identity.',
                 'portada_url' => 'https://www.gutenberg.org/cache/epub/84/pg84.cover.medium.jpg',
                 'idioma' => 'en',
@@ -668,6 +702,7 @@ final class ServicioLecturaPublica
                 'titulo' => 'The Adventures of Sherlock Holmes',
                 'autor' => 'Arthur Conan Doyle',
                 'genero' => 'Dominio publico',
+                'generos' => ['Fiction', 'Detective', 'Mystery'],
                 'descripcion' => 'Collection of detective stories featuring Sherlock Holmes and Dr. Watson.',
                 'portada_url' => 'https://www.gutenberg.org/cache/epub/1661/pg1661.cover.medium.jpg',
                 'idioma' => 'en',
@@ -1036,11 +1071,34 @@ final class ServicioLecturaPublica
             }
         }
 
+        $generos = [];
+        $temas = $resultado['subjects'] ?? [];
+        if (is_array($temas)) {
+            foreach ($temas as $tema) {
+                $temaLimpio = trim((string) $tema);
+                if ($temaLimpio === '') {
+                    continue;
+                }
+                $generos[] = $temaLimpio;
+                if (count($generos) >= 8) {
+                    break;
+                }
+            }
+        }
+
+        $generoPrincipal = 'Dominio publico';
+        if (count($generos) > 0) {
+            $primero = (string) $generos[0];
+            $partes = array_values(array_filter(array_map('trim', explode('--', $primero)), static fn (string $p): bool => $p !== ''));
+            $generoPrincipal = count($partes) > 0 ? $partes[0] : $primero;
+        }
+
         return [
             'id_externo' => (string) ($resultado['id'] ?? ''),
             'titulo' => $titulo,
             'autor' => $autor,
-            'genero' => 'Dominio publico',
+            'genero' => $generoPrincipal,
+            'generos' => $generos,
             'descripcion' => $descripcion,
             'portada_url' => $portadaUrl,
             'idioma' => $idioma,
@@ -1297,10 +1355,52 @@ final class ServicioLecturaPublica
             'ú' => 'u',
             'ü' => 'u',
             'ñ' => 'n',
+            'Ã¡' => 'a',
+            'Ã©' => 'e',
+            'Ã­' => 'i',
+            'Ã³' => 'o',
+            'Ãº' => 'u',
+            'Ã¼' => 'u',
+            'Ã±' => 'n',
         ]);
         $texto = preg_replace('/[^a-z0-9\s]/u', ' ', $texto) ?: $texto;
         $texto = preg_replace('/\s+/u', ' ', $texto) ?: $texto;
         return trim($texto);
+    }
+
+    /**
+     * @param array<string, mixed> $libro
+     */
+    private function coincideGeneroCatalogoLibre(array $libro, string $filtroGeneroNormalizado): bool
+    {
+        if ($filtroGeneroNormalizado === '') {
+            return true;
+        }
+
+        $candidatos = [];
+        $generoPrincipal = trim((string) ($libro['genero'] ?? ''));
+        if ($generoPrincipal !== '') {
+            $candidatos[] = $generoPrincipal;
+        }
+
+        $generos = $libro['generos'] ?? [];
+        if (is_array($generos)) {
+            foreach ($generos as $genero) {
+                $texto = trim((string) $genero);
+                if ($texto !== '') {
+                    $candidatos[] = $texto;
+                }
+            }
+        }
+
+        foreach ($candidatos as $candidato) {
+            $candidatoNormalizado = $this->normalizarTexto((string) $candidato);
+            if ($candidatoNormalizado !== '' && str_contains($candidatoNormalizado, $filtroGeneroNormalizado)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
