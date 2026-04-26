@@ -8,6 +8,7 @@ Aplicacion en PHP con API REST y formularios para gestionar:
 - Busqueda de libros disponibles para intercambio con filtro por genero.
 - Solicitud y devolucion de prestamos.
 - Notificacion a n8n cuando se crea un prestamo (para automatizar Telegram).
+- Lector para prestamos con pagina guardada y barra de progreso (solo si hay fuente publica).
 
 El proyecto utiliza Composer con:
 
@@ -60,6 +61,7 @@ SOURCE database/migracion_apellidos_genero.sql;
 SOURCE database/migracion_telefono_usuarios.sql;
 SOURCE database/migracion_telegram_usuarios.sql;
 SOURCE database/migracion_portada_libros.sql;
+SOURCE database/migracion_lectura_publica_prestamos.sql;
 ```
 
 5. Sirve la carpeta `public/` como raiz web o accede a:
@@ -84,6 +86,8 @@ Rutas de interfaz:
 - `POST /api/usuarios/telegram/desvincular`
 - `DELETE /api/usuarios/cuenta`
 - `GET /api/catalogo/sugerencias?texto=harry`
+- `GET /api/catalogo/libre?texto=quijote` (catalogo gratuito ES/EN)
+- `GET /api/catalogo/libre/lectura?id_externo=123&pagina=1`
 - `POST /api/telegram/vincular`
 - `POST /api/libros`
 - `GET /api/libros?buscar=texto&genero=Novela`
@@ -91,7 +95,14 @@ Rutas de interfaz:
 - `DELETE /api/libros` (JSON: `id_libro`)
 - `POST /api/prestamos`
 - `GET /api/prestamos/mios`
+- `GET /api/prestamos/lectura?id_prestamo=10&pagina=2`
+- `POST /api/prestamos/lectura/progreso`
 - `POST /api/prestamos/devolver`
+
+Reglas de negocio de catalogo:
+
+- **Catalogo gratuito**: lectura directa sin regla 1:1 (idiomas permitidos ES/EN con aviso visual).
+- **Catalogo de usuarios**: para solicitar prestamo se exige tener al menos un libro propio disponible para intercambio.
 
 El endpoint de catalogo global devuelve sugerencias con:
 
@@ -147,6 +158,7 @@ Tambien puedes enviar el token en cabecera HTTP `X-Vinculacion-Token`.
 - `database/migracion_telefono_usuarios.sql`: alteracion para anadir `telefono` en usuarios.
 - `database/migracion_telegram_usuarios.sql`: alteracion para anadir `telegram_chat_id` y `telegram_usuario`.
 - `database/migracion_portada_libros.sql`: alteracion para anadir `portada_url` en libros.
+- `database/migracion_lectura_publica_prestamos.sql`: columnas para lectura publica y progreso por prestamo.
 - `src/`: controladores, repositorios, enrutador y utilidades HTTP.
 - `public/index.php`: front controller de la API y de la vista principal.
 - `public/vistas/login.php`: pantalla de acceso.

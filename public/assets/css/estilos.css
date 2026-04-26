@@ -598,12 +598,80 @@ button:hover {
     max-width: none;
 }
 
+.catalogo-vistas-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    margin-bottom: 0.9rem;
+}
+
+.catalogo-vista-btn {
+    width: auto;
+    min-width: 170px;
+    border-radius: 12px;
+    background: #dfe7f2;
+    color: #243047;
+    font-weight: 700;
+    padding: 0.55rem 0.8rem;
+}
+
+.catalogo-vista-btn:hover {
+    transform: none;
+    filter: none;
+}
+
+.catalogo-vista-btn--activa {
+    background: linear-gradient(120deg, var(--acento), var(--acento-2));
+    color: #fff;
+}
+
+.catalogo-vista[hidden] {
+    display: none;
+}
+
+.catalogo-libre-secciones {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.catalogo-libre-seccion {
+    border: 1px solid #dbe5f0;
+    border-radius: 12px;
+    padding: 0.75rem;
+    background: #f9fcff;
+}
+
+.catalogo-libre-paginacion {
+    margin-top: 0.7rem;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.catalogo-libre-paginacion button {
+    width: auto;
+    min-width: 110px;
+}
+
+.catalogo-subtitulo {
+    margin: 0 0 0.65rem;
+    font-size: 1rem;
+    font-family: "Space Grotesk", sans-serif;
+}
+
 .catalogo-filtros {
     display: grid;
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) 160px;
     gap: 0.7rem;
     align-items: end;
     margin-bottom: 0.9rem;
+}
+
+.catalogo-filtros--libre {
+    grid-template-columns: minmax(0, 1fr) 160px;
 }
 
 .catalogo-filtro-grupo label {
@@ -680,6 +748,26 @@ button:hover {
     margin: 0.14rem 0;
 }
 
+.catalogo-idioma-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 30px;
+    margin-left: 0.45rem;
+    padding: 0.1rem 0.42rem;
+    border-radius: 999px;
+    background: #e4f5ec;
+    color: #146739;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+}
+
+.catalogo-idioma-badge--en {
+    background: #fff4d8;
+    color: #9a5b00;
+}
+
 .catalogo-descripcion {
     margin: 0.45rem 0 0;
     color: #4f5e73;
@@ -737,6 +825,61 @@ button:hover {
 
 .subcard--compacta {
     max-width: 920px;
+}
+
+.subseccion-lectura {
+    margin-bottom: 0.9rem;
+    padding: 0.75rem;
+    border: 1px solid #dbe5f0;
+    border-radius: 12px;
+    background: #f9fcff;
+}
+
+.subseccion-lectura h4 {
+    margin: 0 0 0.55rem;
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 1rem;
+}
+
+.lista-continuar-lectura li {
+    margin-bottom: 0.55rem;
+}
+
+.lista-continuar-lectura li:last-child {
+    margin-bottom: 0;
+}
+
+.continuar-lectura-item {
+    display: grid;
+    grid-template-columns: 64px 1fr auto;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.continuar-lectura-item .portada-wrap {
+    width: 64px;
+    height: 92px;
+}
+
+.continuar-lectura-texto strong {
+    display: block;
+    line-height: 1.28;
+    margin-bottom: 0.2rem;
+}
+
+.continuar-lectura-texto .pequeno {
+    margin: 0.14rem 0;
+}
+
+.continuar-lectura-accion {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.continuar-lectura-accion button {
+    width: auto;
+    min-width: 130px;
 }
 
 .subcard--peligro {
@@ -865,13 +1008,13 @@ button:hover {
 }
 
 .libro-accion--prestamo > button {
-    width: 210px;
-    min-width: 210px;
-    max-width: 210px;
+    width: 170px;
+    min-width: 170px;
+    max-width: 170px;
 }
 
 .libro-accion--prestamo .pequeno {
-    width: 210px;
+    width: 170px;
     text-align: right;
 }
 
@@ -991,6 +1134,114 @@ button:hover {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+}
+
+.modal-lector-contenido {
+    width: min(1180px, 98vw);
+    max-height: 92vh;
+    background: #fff;
+    border: 1px solid #d6e1ee;
+    border-radius: 14px;
+    box-shadow: 0 25px 65px rgba(10, 22, 40, 0.33);
+    padding: 1rem;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.lector-cabecera {
+    margin-bottom: 0.5rem;
+    padding-right: 2.2rem;
+}
+
+.lector-cabecera h3 {
+    margin: 0 0 0.35rem;
+    font-family: "Space Grotesk", sans-serif;
+}
+
+.lector-cabecera .pequeno {
+    margin: 0;
+}
+
+.lector-pagina-info {
+    margin: 0 0 0.65rem;
+    font-weight: 700;
+    color: #334256;
+    font-size: 0.9rem;
+}
+
+.lector-progreso {
+    margin: 0 0 0.7rem;
+}
+
+.lector-progreso-barra {
+    width: 100%;
+    height: 10px;
+    border-radius: 999px;
+    background: #dde6f3;
+    overflow: hidden;
+}
+
+.lector-progreso-valor {
+    height: 100%;
+    width: 0%;
+    border-radius: inherit;
+    background: linear-gradient(120deg, var(--acento), var(--acento-2));
+    transition: width 0.18s ease;
+}
+
+.lector-progreso-texto {
+    margin: 0.32rem 0 0;
+}
+
+.lector-texto {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    background: #fbfcff;
+    border: 1px solid #dbe5f0;
+    border-radius: 12px;
+    padding: 1rem;
+    color: #36475e;
+    line-height: 1.72;
+    white-space: pre-wrap;
+    user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select: none;
+}
+
+.lector-bloque-parrafo {
+    margin: 0 0 1rem;
+}
+
+.lector-bloque-parrafo:last-child {
+    margin-bottom: 0;
+}
+
+.lector-bloque-titulo {
+    margin: 0.25rem 0 0.85rem;
+    font-size: 1.06rem;
+    line-height: 1.35;
+    color: #20324b;
+    font-family: "Space Grotesk", sans-serif;
+}
+
+.lector-controles {
+    margin-top: 0.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.6rem;
+}
+
+.lector-controles button {
+    width: auto;
+    min-width: 170px;
+}
+
+.lector-aviso {
+    margin: 0.7rem 0 0;
 }
 
 .modal-cerrar {
@@ -1114,12 +1365,30 @@ button:hover {
         grid-template-columns: 1fr;
     }
 
+    .catalogo-filtros--libre {
+        grid-template-columns: 1fr;
+    }
+
     .catalogo-busqueda-fila {
         grid-template-columns: 1fr;
     }
 
+    .catalogo-libre-paginacion {
+        justify-content: flex-start;
+    }
+
     .fila-corta {
         grid-template-columns: 1fr;
+    }
+
+    .continuar-lectura-item {
+        grid-template-columns: 64px minmax(0, 1fr);
+        align-items: start;
+    }
+
+    .continuar-lectura-accion {
+        grid-column: 1 / -1;
+        justify-content: flex-start;
     }
 
     .libro-item {
@@ -1161,6 +1430,11 @@ button:hover {
     .modal-libro-contenido {
         width: min(94vw, 540px);
         max-height: 84vh;
+    }
+
+    .modal-lector-contenido {
+        width: min(96vw, 700px);
+        max-height: 88vh;
     }
 
     .detalle-libro-layout {
@@ -1258,6 +1532,14 @@ button:hover {
         min-width: 132px;
     }
 
+    .catalogo-libre-paginacion {
+        justify-content: center;
+    }
+
+    .catalogo-libre-paginacion button {
+        min-width: 120px;
+    }
+
     .libro-item {
         grid-template-columns: 92px minmax(0, 1fr);
         gap: 0.8rem;
@@ -1266,6 +1548,16 @@ button:hover {
     .libro-item .portada-wrap {
         width: 92px;
         height: 132px;
+    }
+
+    .continuar-lectura-item {
+        grid-template-columns: 56px minmax(0, 1fr);
+        gap: 0.62rem;
+    }
+
+    .continuar-lectura-item .portada-wrap {
+        width: 56px;
+        height: 82px;
     }
 
     .libro-accion,
@@ -1280,6 +1572,11 @@ button:hover {
         min-width: 132px;
     }
 
+    .libro-accion--prestamo .pequeno {
+        width: auto;
+        text-align: left;
+    }
+
     .modal-libro {
         padding: 0.65rem;
     }
@@ -1288,6 +1585,14 @@ button:hover {
         width: 100%;
         height: min(82vh, 620px);
         max-height: min(82vh, 620px);
+        overflow: hidden;
+        padding: 0.85rem;
+    }
+
+    .modal-lector-contenido {
+        width: 100%;
+        height: min(86vh, 700px);
+        max-height: min(86vh, 700px);
         overflow: hidden;
         padding: 0.85rem;
     }
@@ -1318,6 +1623,17 @@ button:hover {
     }
 
     .detalle-libro-acciones button {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .lector-texto {
+        font-size: 0.95rem;
+        line-height: 1.62;
+        padding: 0.85rem;
+    }
+
+    .lector-controles button {
         width: 100%;
         min-width: 0;
     }

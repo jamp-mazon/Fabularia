@@ -262,6 +262,21 @@ final class RepositorioLibros
         return (bool) $sentencia->fetch();
     }
 
+    public function usuarioTieneLibroDisponibleParaIntercambio(int $idUsuario): bool
+    {
+        $sql = 'SELECT l.id
+                FROM libros l
+                LEFT JOIN prestamos p ON p.id_libro = l.id AND p.fecha_devolucion IS NULL
+                WHERE l.id_usuario = :id_usuario
+                  AND l.activo_intercambio = 1
+                  AND p.id IS NULL
+                LIMIT 1';
+        $sentencia = $this->conexion->prepare($sql);
+        $sentencia->execute(['id_usuario' => $idUsuario]);
+
+        return (bool) $sentencia->fetch();
+    }
+
     public function eliminarLibroDeUsuario(int $idLibro, int $idUsuario): bool
     {
         $sql = 'DELETE FROM libros

@@ -14,6 +14,7 @@ use Fabularia\Repositorios\RepositorioPrestamos;
 use Fabularia\Repositorios\RepositorioUsuarios;
 use Fabularia\Servicios\ServicioCatalogoLibros;
 use Fabularia\Servicios\ServicioCorreo;
+use Fabularia\Servicios\ServicioLecturaPublica;
 use Fabularia\Servicios\ServicioWebhookPrestamos;
 
 $contenedor = require __DIR__ . '/../config/bootstrap.php';
@@ -109,6 +110,10 @@ $servicioCorreo = new ServicioCorreo(
     (string) ($_ENV['MAIL_FROM_EMAIL'] ?? ''),
     (string) ($_ENV['MAIL_FROM_NAME'] ?? 'Fabularia')
 );
+$servicioLecturaPublica = new ServicioLecturaPublica(
+    $logger,
+    (string) ($_ENV['LECTURA_CACHE_DIR'] ?? (dirname(__DIR__) . '/storage/lecturas'))
+);
 
 $controladorUsuarios = new ControladorUsuarios(
     $repositorioUsuarios,
@@ -118,7 +123,7 @@ $controladorUsuarios = new ControladorUsuarios(
     (int) ($_ENV['PASSWORD_RESET_TTL_MINUTES'] ?? 30)
 );
 $controladorLibros = new ControladorLibros($repositorioLibros, $logger);
-$controladorCatalogoLibros = new ControladorCatalogoLibros($servicioCatalogoLibros);
+$controladorCatalogoLibros = new ControladorCatalogoLibros($servicioCatalogoLibros, $servicioLecturaPublica);
 $controladorTelegram = new ControladorTelegram(
     $repositorioUsuarios,
     $logger,
@@ -128,6 +133,7 @@ $controladorPrestamos = new ControladorPrestamos(
     $repositorioPrestamos,
     $repositorioLibros,
     $repositorioUsuarios,
+    $servicioLecturaPublica,
     $servicioWebhookPrestamos,
     $logger
 );
@@ -192,6 +198,8 @@ $enrutador->registrar('POST', '/api/usuarios/cambiar-contrasena', static fn () =
 $enrutador->registrar('POST', '/api/usuarios/telegram/desvincular', static fn () => $controladorUsuarios->desvincularTelegram(), true);
 $enrutador->registrar('DELETE', '/api/usuarios/cuenta', static fn () => $controladorUsuarios->eliminarCuenta(), true);
 $enrutador->registrar('GET', '/api/catalogo/sugerencias', static fn () => $controladorCatalogoLibros->sugerencias(), true);
+$enrutador->registrar('GET', '/api/catalogo/libre', static fn () => $controladorCatalogoLibros->catalogoLibre(), true);
+$enrutador->registrar('GET', '/api/catalogo/libre/lectura', static fn () => $controladorCatalogoLibros->leerCatalogoLibre(), true);
 $enrutador->registrar('POST', '/api/telegram/vincular', static fn () => $controladorTelegram->vincularCuenta());
 
 $enrutador->registrar('POST', '/api/libros', static fn () => $controladorLibros->publicarLibro(), true);
@@ -201,6 +209,8 @@ $enrutador->registrar('DELETE', '/api/libros', static fn () => $controladorLibro
 
 $enrutador->registrar('POST', '/api/prestamos', static fn () => $controladorPrestamos->solicitarPrestamo(), true);
 $enrutador->registrar('GET', '/api/prestamos/mios', static fn () => $controladorPrestamos->listarMisPrestamos(), true);
+$enrutador->registrar('GET', '/api/prestamos/lectura', static fn () => $controladorPrestamos->leerPrestamo(), true);
+$enrutador->registrar('POST', '/api/prestamos/lectura/progreso', static fn () => $controladorPrestamos->guardarProgresoLectura(), true);
 $enrutador->registrar('POST', '/api/prestamos/devolver', static fn () => $controladorPrestamos->devolverPrestamo(), true);
 
 try {

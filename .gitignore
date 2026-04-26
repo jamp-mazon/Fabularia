@@ -2,3 +2,6 @@
 /.env
 /logs/*.log
 /.env.
+/Fabularia-clean/
+/Fabularia-clean.git/
+/storage/lecturas/
