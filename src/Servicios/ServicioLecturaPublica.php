@@ -63,16 +63,24 @@ final class ServicioLecturaPublica
     {
         $lecturaPublica = (int) ($prestamo['lectura_publica'] ?? 0) === 1;
         $url = trim((string) ($prestamo['lectura_url'] ?? ''));
+        $fuente = trim((string) ($prestamo['lectura_fuente'] ?? ''));
 
-        if (!$lecturaPublica || $url === '') {
+        if (!$lecturaPublica) {
             throw new RuntimeException('El libro de este prestamo no tiene lectura publica disponible.');
         }
 
-        $fuente = trim((string) ($prestamo['lectura_fuente'] ?? ''));
-        $idExterno = trim((string) ($prestamo['lectura_id_externo'] ?? ''));
-        $formato = trim((string) ($prestamo['lectura_formato'] ?? ''));
-        $cacheKey = sha1($fuente . '|' . $idExterno . '|' . $url . '|' . $formato);
-        $paginas = $this->obtenerPaginasDesdeCache($cacheKey, $url, $formato, true);
+        if ($fuente === 'epub_demo') {
+            $paginas = $this->generarPaginasDemoDesdePrestamo($prestamo);
+        } else {
+            if ($url === '') {
+                throw new RuntimeException('El libro de este prestamo no tiene lectura publica disponible.');
+            }
+
+            $idExterno = trim((string) ($prestamo['lectura_id_externo'] ?? ''));
+            $formato = trim((string) ($prestamo['lectura_formato'] ?? ''));
+            $cacheKey = sha1($fuente . '|' . $idExterno . '|' . $url . '|' . $formato);
+            $paginas = $this->obtenerPaginasDesdeCache($cacheKey, $url, $formato, true);
+        }
 
         $totalPaginas = count($paginas);
         if ($totalPaginas <= 0) {
@@ -93,6 +101,51 @@ final class ServicioLecturaPublica
             'porcentaje_progreso' => $progreso,
             'contenido' => $contenido,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $prestamo
+     * @return array<int, string>
+     */
+    private function generarPaginasDemoDesdePrestamo(array $prestamo): array
+    {
+        $titulo = trim((string) ($prestamo['titulo'] ?? 'Libro sin titulo'));
+        $autor = trim((string) ($prestamo['autor'] ?? 'Autor desconocido'));
+        $genero = trim((string) ($prestamo['genero'] ?? 'General'));
+        $descripcion = trim((string) ($prestamo['descripcion'] ?? ''));
+
+        if ($descripcion === '') {
+            $descripcion = 'Esta edicion EPUB es una simulacion de lectura para el proyecto Fabularia.';
+        }
+
+        $bloques = [];
+        $bloques[] = strtoupper($titulo);
+        $bloques[] = 'Autor: ' . $autor;
+        $bloques[] = 'Genero: ' . $genero;
+        $bloques[] = 'Prologo';
+        $bloques[] = 'Comienzas la lectura de "' . $titulo . '". Este texto esta diseÃ±ado como una muestra completa de varias paginas para validar la experiencia de lectura dentro de la aplicacion.';
+        $bloques[] = $descripcion;
+
+        $capitulos = [
+            'Capitulo 1. La llegada',
+            'Capitulo 2. La promesa',
+            'Capitulo 3. La busqueda',
+            'Capitulo 4. El conflicto',
+            'Capitulo 5. El cambio',
+            'Capitulo 6. El cierre',
+            'Epilogo',
+        ];
+
+        foreach ($capitulos as $indice => $capitulo) {
+            $numero = $indice + 1;
+            $bloques[] = $capitulo;
+            $bloques[] = 'En esta seccion del relato, la narracion avanza con ritmo constante y describe decisiones que alteran el rumbo de la historia. El objetivo principal es que la lectura se sienta real al pasar paginas.';
+            $bloques[] = 'El personaje central afronta dudas, alianzas y obstaculos. Cada escena conecta con la anterior para construir continuidad y permitir que la barra de progreso refleje claramente el avance del lector.';
+            $bloques[] = 'Fragmento de practica ' . $numero . ': si cierras y vuelves a abrir el lector, la plataforma conserva la pagina actual y el porcentaje completado.';
+        }
+
+        $texto = trim(implode("\n\n", $bloques));
+        return $this->dividirTextoEnPaginas($texto);
     }
 
     /**
@@ -1071,6 +1124,7 @@ final class ServicioLecturaPublica
             }
         }
 
+        $generosOriginales = [];
         $generos = [];
         $temas = $resultado['subjects'] ?? [];
         if (is_array($temas)) {
@@ -1079,19 +1133,36 @@ final class ServicioLecturaPublica
                 if ($temaLimpio === '') {
                     continue;
                 }
-                $generos[] = $temaLimpio;
-                if (count($generos) >= 8) {
+                $generosOriginales[] = $temaLimpio;
+                $generos[] = $this->traducirGeneroCatalogoLibre($temaLimpio);
+                if (count($generosOriginales) >= 8) {
                     break;
                 }
             }
         }
 
         $generoPrincipal = 'Dominio publico';
-        if (count($generos) > 0) {
-            $primero = (string) $generos[0];
+        if (count($generosOriginales) > 0) {
+            $primero = (string) $generosOriginales[0];
             $partes = array_values(array_filter(array_map('trim', explode('--', $primero)), static fn (string $p): bool => $p !== ''));
-            $generoPrincipal = count($partes) > 0 ? $partes[0] : $primero;
+            $generoBase = count($partes) > 0 ? $partes[0] : $primero;
+            $generoPrincipal = $this->traducirGeneroCatalogoLibre($generoBase);
         }
+
+        $idioma = $this->resolverIdiomaContenidoCatalogoLibre(
+            $idioma,
+            $titulo,
+            $descripcion,
+            $generosOriginales
+        );
+
+        $descripcion = $this->normalizarDescripcionCatalogoLibre(
+            $descripcion,
+            $idioma,
+            $titulo,
+            $autor,
+            $generos
+        );
 
         return [
             'id_externo' => (string) ($resultado['id'] ?? ''),
@@ -1099,6 +1170,7 @@ final class ServicioLecturaPublica
             'autor' => $autor,
             'genero' => $generoPrincipal,
             'generos' => $generos,
+            'generos_originales' => $generosOriginales,
             'descripcion' => $descripcion,
             'portada_url' => $portadaUrl,
             'idioma' => $idioma,
@@ -1133,6 +1205,36 @@ final class ServicioLecturaPublica
         }
 
         return null;
+    }
+
+    /**
+     * @param array<int, string> $generosOriginales
+     */
+    private function resolverIdiomaContenidoCatalogoLibre(
+        string $idiomaDeclarado,
+        string $titulo,
+        string $descripcion,
+        array $generosOriginales
+    ): string {
+        $idiomaDeclarado = trim(mb_strtolower($idiomaDeclarado, 'UTF-8'));
+        if ($idiomaDeclarado !== 'es') {
+            return $idiomaDeclarado;
+        }
+
+        $muestra = trim($descripcion . "\n" . $titulo . "\n" . implode('. ', array_slice($generosOriginales, 0, 4)));
+        if ($muestra === '') {
+            return 'es';
+        }
+
+        if ($this->pareceTextoEnEspanol($muestra)) {
+            return 'es';
+        }
+
+        if ($this->pareceTextoEnIngles($muestra)) {
+            return 'en';
+        }
+
+        return 'es';
     }
 
     /**
@@ -1344,17 +1446,29 @@ final class ServicioLecturaPublica
         return $this->directorioCacheLecturas . DIRECTORY_SEPARATOR . 'json-' . sha1($url) . '.json';
     }
 
+    /**
+     * Crea una referencia de lectura local tipo EPUB simulado para libros de usuarios.
+     *
+     * @param array<string, mixed> $libro
+     * @return array<string, mixed>
+     */
+    public function construirReferenciaEpubPredeterminada(array $libro): array
+    {
+        $idLibro = (int) ($libro['id'] ?? $libro['id_libro'] ?? 0);
+
+        return [
+            'lectura_publica' => 1,
+            'lectura_fuente' => 'epub_demo',
+            'lectura_id_externo' => 'usuario-libro-' . max(1, $idLibro),
+            'lectura_url' => 'local://epub-demo',
+            'lectura_formato' => 'application/epub+zip',
+        ];
+    }
+
     private function normalizarTexto(string $texto): string
     {
         $texto = mb_strtolower(trim($texto), 'UTF-8');
         $texto = strtr($texto, [
-            'á' => 'a',
-            'é' => 'e',
-            'í' => 'i',
-            'ó' => 'o',
-            'ú' => 'u',
-            'ü' => 'u',
-            'ñ' => 'n',
             'Ã¡' => 'a',
             'Ã©' => 'e',
             'Ã­' => 'i',
@@ -1362,10 +1476,125 @@ final class ServicioLecturaPublica
             'Ãº' => 'u',
             'Ã¼' => 'u',
             'Ã±' => 'n',
+            'ÃƒÂ¡' => 'a',
+            'ÃƒÂ©' => 'e',
+            'ÃƒÂ­' => 'i',
+            'ÃƒÂ³' => 'o',
+            'ÃƒÂº' => 'u',
+            'ÃƒÂ¼' => 'u',
+            'ÃƒÂ±' => 'n',
+            'ÃƒÆ’Ã‚Â¡' => 'a',
+            'ÃƒÆ’Ã‚Â©' => 'e',
+            'ÃƒÆ’Ã‚Â­' => 'i',
+            'ÃƒÆ’Ã‚Â³' => 'o',
+            'ÃƒÆ’Ã‚Âº' => 'u',
+            'ÃƒÆ’Ã‚Â¼' => 'u',
+            'ÃƒÆ’Ã‚Â±' => 'n',
         ]);
         $texto = preg_replace('/[^a-z0-9\s]/u', ' ', $texto) ?: $texto;
         $texto = preg_replace('/\s+/u', ' ', $texto) ?: $texto;
         return trim($texto);
+    }
+
+    /**
+     * @param array<int, string> $generosTraducidos
+     */
+    private function normalizarDescripcionCatalogoLibre(
+        string $descripcion,
+        string $idioma,
+        string $titulo,
+        string $autor,
+        array $generosTraducidos
+    ): string {
+        $descripcion = trim($descripcion);
+        if ($descripcion === '') {
+            return $this->generarDescripcionFallbackEspanol($titulo, $autor, $generosTraducidos);
+        }
+
+        if ($idioma !== 'es') {
+            return $descripcion;
+        }
+
+        if ($this->pareceTextoEnEspanol($descripcion)) {
+            return $descripcion;
+        }
+
+        return $this->generarDescripcionFallbackEspanol($titulo, $autor, $generosTraducidos);
+    }
+
+    /**
+     * @param array<int, string> $generosTraducidos
+     */
+    private function generarDescripcionFallbackEspanol(string $titulo, string $autor, array $generosTraducidos): string
+    {
+        $titulo = trim($titulo);
+        $autor = trim($autor);
+        $fragmentoGenero = '';
+        if (count($generosTraducidos) > 0) {
+            $fragmentoGenero = ' Pertenece a: ' . implode(' / ', array_slice($generosTraducidos, 0, 3)) . '.';
+        }
+
+        if ($titulo === '' && $autor === '') {
+            return 'Libro de dominio pÃºblico disponible para lectura en la plataforma.' . $fragmentoGenero;
+        }
+
+        if ($autor === '') {
+            return 'Libro de dominio pÃºblico: ' . $titulo . '.' . $fragmentoGenero;
+        }
+
+        return 'Libro de dominio pÃºblico de ' . $autor . ': ' . $titulo . '.' . $fragmentoGenero;
+    }
+
+    private function traducirGeneroCatalogoLibre(string $genero): string
+    {
+        $genero = trim($genero);
+        if ($genero === '') {
+            return 'Dominio pÃºblico';
+        }
+
+        $reemplazos = [
+            'knights and knighthood' => 'CaballerÃ­a',
+            'juvenile fiction' => 'FicciÃ³n juvenil',
+            'science fiction' => 'Ciencia ficciÃ³n',
+            'spanish language' => 'Lengua espaÃ±ola',
+            'history' => 'Historia',
+            'fiction' => 'FicciÃ³n',
+            'classics' => 'ClÃ¡sicos',
+            'classic' => 'ClÃ¡sico',
+            'crime' => 'Crimen',
+            'fables' => 'FÃ¡bulas',
+            'greek' => 'griego',
+            'translations into spanish' => 'Traducciones al espaÃ±ol',
+            'translation' => 'TraducciÃ³n',
+            'translations' => 'Traducciones',
+            'adventure' => 'Aventura',
+            'mystery' => 'Misterio',
+            'detective' => 'Detective',
+            'romance' => 'Romance',
+            'gothic' => 'GÃ³tico',
+            'poetry' => 'PoesÃ­a',
+            'language' => 'Lengua',
+            'philosophy' => 'FilosofÃ­a',
+            'religion' => 'ReligiÃ³n',
+            'mythology' => 'MitologÃ­a',
+            'epic' => 'Ã‰pico',
+            'drama' => 'Drama',
+            'humor' => 'Humor',
+            'biography' => 'BiografÃ­a',
+            'autobiography' => 'AutobiografÃ­a',
+            'education' => 'EducaciÃ³n',
+            'politics' => 'PolÃ­tica',
+            'essays' => 'Ensayos',
+            'essay' => 'Ensayo',
+        ];
+
+        $traducido = $genero;
+        foreach ($reemplazos as $origen => $destino) {
+            $traducido = preg_replace('/\b' . preg_quote($origen, '/') . '\b/i', $destino, $traducido) ?? $traducido;
+        }
+
+        $traducido = preg_replace('/\s+/', ' ', $traducido) ?? $traducido;
+        return trim($traducido, " \t\n\r\0\x0B,.;");
     }
 
     /**
@@ -1386,6 +1615,16 @@ final class ServicioLecturaPublica
         $generos = $libro['generos'] ?? [];
         if (is_array($generos)) {
             foreach ($generos as $genero) {
+                $texto = trim((string) $genero);
+                if ($texto !== '') {
+                    $candidatos[] = $texto;
+                }
+            }
+        }
+
+        $generosOriginales = $libro['generos_originales'] ?? [];
+        if (is_array($generosOriginales)) {
+            foreach ($generosOriginales as $genero) {
                 $texto = trim((string) $genero);
                 if ($texto !== '') {
                     $candidatos[] = $texto;
@@ -1427,26 +1666,97 @@ final class ServicioLecturaPublica
         $palabras = preg_split('/[^a-záéíóúüñ]+/u', $muestra) ?: [];
         $palabras = array_values(array_filter($palabras, static fn (string $p): bool => $p !== ''));
 
-        if (count($palabras) < 80) {
+        if (count($palabras) < 6) {
             return true;
         }
 
-        $comunes = array_flip([
+        $comunesEs = [
             'de', 'la', 'que', 'el', 'en', 'y', 'a', 'los', 'del', 'se', 'las',
             'por', 'un', 'para', 'con', 'no', 'una', 'su', 'al', 'lo', 'como',
             'mas', 'pero', 'sus', 'le', 'ya', 'o', 'fue', 'ha', 'si', 'porque',
             'esta', 'entre', 'cuando', 'muy', 'sin', 'sobre', 'tambien', 'me',
             'hasta', 'hay', 'donde', 'quien', 'desde', 'todo', 'nos', 'durante',
-        ]);
+        ];
+        $comunesEn = [
+            'the', 'and', 'of', 'to', 'in', 'a', 'is', 'that', 'for', 'with',
+            'as', 'on', 'was', 'were', 'by', 'from', 'at', 'or', 'this', 'it',
+            'be', 'are', 'an', 'not', 'which', 'but', 'his', 'her', 'their',
+            'into', 'than', 'there', 'these', 'those', 'about', 'such',
+        ];
 
+        $aciertosEs = $this->contarCoincidenciasPalabras($palabras, $comunesEs);
+        $aciertosEn = $this->contarCoincidenciasPalabras($palabras, $comunesEn);
+        $total = max(1, count($palabras));
+        $ratioEs = $aciertosEs / $total;
+        $ratioEn = $aciertosEn / $total;
+
+        if ($total < 80) {
+            if ($ratioEn >= 0.08 && $ratioEn > ($ratioEs + 0.03)) {
+                return false;
+            }
+            if ($ratioEs >= 0.06) {
+                return true;
+            }
+            return $ratioEs >= $ratioEn;
+        }
+
+        return $ratioEs >= 0.09 && $ratioEs >= ($ratioEn + 0.01);
+    }
+
+    private function pareceTextoEnIngles(string $texto): bool
+    {
+        $muestra = mb_substr(mb_strtolower($texto, 'UTF-8'), 0, 16000, 'UTF-8');
+        $palabras = preg_split('/[^a-z]+/u', $muestra) ?: [];
+        $palabras = array_values(array_filter($palabras, static fn (string $p): bool => $p !== ''));
+
+        if (count($palabras) < 6) {
+            return false;
+        }
+
+        $comunesEn = [
+            'the', 'and', 'of', 'to', 'in', 'a', 'is', 'that', 'for', 'with',
+            'as', 'on', 'was', 'were', 'by', 'from', 'at', 'or', 'this', 'it',
+            'be', 'are', 'an', 'not', 'which', 'but', 'his', 'her', 'their',
+            'into', 'than', 'there', 'these', 'those', 'about', 'such',
+        ];
+        $comunesEs = [
+            'de', 'la', 'que', 'el', 'en', 'y', 'a', 'los', 'del', 'se', 'las',
+            'por', 'un', 'para', 'con', 'no', 'una', 'su', 'al', 'lo', 'como',
+            'mas', 'pero', 'sus', 'le', 'ya', 'o', 'fue', 'ha', 'si', 'porque',
+            'esta', 'entre', 'cuando', 'muy', 'sin', 'sobre', 'tambien', 'me',
+            'hasta', 'hay', 'donde', 'quien', 'desde', 'todo', 'nos', 'durante',
+        ];
+
+        $aciertosEn = $this->contarCoincidenciasPalabras($palabras, $comunesEn);
+        $aciertosEs = $this->contarCoincidenciasPalabras($palabras, $comunesEs);
+        $total = max(1, count($palabras));
+        $ratioEn = $aciertosEn / $total;
+        $ratioEs = $aciertosEs / $total;
+
+        return $ratioEn >= 0.08 && $ratioEn > ($ratioEs + 0.02);
+    }
+
+    /**
+     * @param array<int, string> $palabras
+     * @param array<int, string> $diccionario
+     */
+    private function contarCoincidenciasPalabras(array $palabras, array $diccionario): int
+    {
+        if (count($palabras) === 0 || count($diccionario) === 0) {
+            return 0;
+        }
+
+        $indice = array_flip($diccionario);
         $aciertos = 0;
         foreach ($palabras as $palabra) {
-            if (isset($comunes[$palabra])) {
+            if (isset($indice[$palabra])) {
                 $aciertos++;
             }
         }
 
-        $ratio = $aciertos / max(1, count($palabras));
-        return $ratio >= 0.09;
+        return $aciertos;
     }
 }
+
+
+

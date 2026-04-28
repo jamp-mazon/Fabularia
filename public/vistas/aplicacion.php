@@ -143,10 +143,14 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
                         <label for="libroPortada">Portada (URL, opcional)</label>
                         <input id="libroPortada" name="portada_url" type="url" placeholder="https://...">
 
+                        <label for="libroArchivo">Archivo del libro (EPUB o PDF, opcional)</label>
+                        <input id="libroArchivo" name="archivo_libro" type="file" accept=".epub,.pdf,application/epub+zip,application/pdf">
+                        <p class="pequeno">Tamano maximo: 25 MB.</p>
+
                         <label for="libroDescripcion">Descripción</label>
                         <textarea id="libroDescripcion" name="descripcion" placeholder="Estado del libro, edición, etc."></textarea>
 
-                        <button type="submit" style="margin-top:0.8rem;">Guardar libro</button>
+                        <button type="submit" class="boton-compacto" style="margin-top:0.8rem;">Guardar libro</button>
                     </form>
                 </article>
             </section>
@@ -157,6 +161,10 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
                     <section id="bloqueContinuarLectura" class="subseccion-lectura" hidden>
                         <h4>Continuar lectura</h4>
                         <ul id="listaContinuarLectura" class="lista lista-continuar-lectura"></ul>
+                    </section>
+                    <section id="bloqueLecturasCompletadas" class="subseccion-lectura" hidden>
+                        <h4>Libros completados</h4>
+                        <ul id="listaLecturasCompletadas" class="lista lista-continuar-lectura"></ul>
                     </section>
                     <section class="subseccion-lectura">
                         <h4 id="tituloSeccionMisLibros">Mis libros para prestar</h4>
@@ -316,6 +324,8 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
     const listaLibrosDisponibles = document.getElementById("listaLibrosDisponibles");
     const bloqueContinuarLectura = document.getElementById("bloqueContinuarLectura");
     const listaContinuarLectura = document.getElementById("listaContinuarLectura");
+    const bloqueLecturasCompletadas = document.getElementById("bloqueLecturasCompletadas");
+    const listaLecturasCompletadas = document.getElementById("listaLecturasCompletadas");
     const tituloSeccionMisLibros = document.getElementById("tituloSeccionMisLibros");
     const estadoSeccionMisLibros = document.getElementById("estadoSeccionMisLibros");
     const modalDetalleLibro = document.getElementById("modalDetalleLibro");
@@ -359,6 +369,8 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
     let animacionCargaCatalogoLibres = null;
     const cacheCatalogoLibre = new Map();
     const solicitudesCatalogoLibrePendientes = new Map();
+    let idUsuarioActivo = 0;
+    let avisoCapturaMostrado = false;
 
     function escaparHtml(texto) {
         return String(texto ?? "")
@@ -393,6 +405,19 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
 
         mensaje.className = "mensaje";
         mensaje.textContent = "";
+    }
+
+    function mostrarAvisoCapturaIlegal() {
+        if (avisoCapturaMostrado) {
+            return;
+        }
+
+        avisoCapturaMostrado = true;
+        mostrarMensaje(
+            "Aviso legal: la copia o captura no autorizada del contenido puede acarrear la suspension de la cuenta.",
+            "error",
+            6500
+        );
     }
 
     function claveCacheCatalogoLibre(texto, genero, paginaEs, paginaEn) {
@@ -645,12 +670,87 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         return `${limpio.slice(0, maximoCaracteres).trimEnd()}...`;
     }
 
+    function calcularEstadoProgresoLectura(paginaActual, totalPaginasBruto) {
+        const pagina = Math.max(1, Number(paginaActual) || 1);
+        const totalBruto = Number(totalPaginasBruto) || 0;
+
+        if (totalBruto <= 1) {
+            return {
+                pagina_actual: pagina,
+                total_paginas: Math.max(1, totalBruto),
+                porcentaje: 0,
+                texto: `Pagina guardada: ${pagina} (0% completado)`,
+                completo: false,
+            };
+        }
+
+        const total = Math.max(2, totalBruto);
+        const porcentaje = Math.min(100, Math.max(1, Math.round((pagina / total) * 100)));
+        return {
+            pagina_actual: pagina,
+            total_paginas: total,
+            porcentaje,
+            texto: `Pagina ${pagina} de ${total} (${porcentaje}% completado)`,
+            completo: porcentaje >= 100,
+        };
+    }
+
     function obtenerClaveProgresoLibre(idExterno) {
-        return `fabularia_lectura_libre_${String(idExterno || "").trim()}`;
+        return `fabularia_lectura_libre_u${idUsuarioActivo}_${String(idExterno || "").trim()}`;
     }
 
     function obtenerClaveIndiceLecturasLibres() {
-        return "fabularia_lecturas_libres_indice";
+        return `fabularia_lecturas_libres_indice_u${idUsuarioActivo}`;
+    }
+
+    function obtenerClavePrestamosOcultos() {
+        return `fabularia_prestamos_ocultos_u${idUsuarioActivo}`;
+    }
+
+    function cargarPrestamosOcultos() {
+        const bruto = localStorage.getItem(obtenerClavePrestamosOcultos());
+        if (!bruto) {
+            return [];
+        }
+
+        try {
+            const datos = JSON.parse(bruto);
+            if (!Array.isArray(datos)) {
+                return [];
+            }
+            return datos
+                .map((id) => Number(id))
+                .filter((id) => Number.isInteger(id) && id > 0);
+        } catch {
+            return [];
+        }
+    }
+
+    function guardarPrestamosOcultos(ids) {
+        localStorage.setItem(obtenerClavePrestamosOcultos(), JSON.stringify(ids));
+    }
+
+    function ocultarPrestamoEnContinuar(idPrestamo) {
+        const id = Number(idPrestamo);
+        if (!Number.isInteger(id) || id <= 0) {
+            return;
+        }
+
+        const actuales = new Set(cargarPrestamosOcultos());
+        actuales.add(id);
+        guardarPrestamosOcultos(Array.from(actuales));
+    }
+
+    function dejarDeSeguirLecturaLibre(idExterno) {
+        const id = String(idExterno || "").trim();
+        if (!id) {
+            return;
+        }
+
+        const indice = cargarIndiceLecturasLibres();
+        delete indice[id];
+        guardarIndiceLecturasLibres(indice);
+        localStorage.removeItem(obtenerClaveProgresoLibre(id));
     }
 
     function cargarProgresoLibreGuardado(idExterno) {
@@ -1272,29 +1372,25 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
     }
 
     function renderizarContinuarLectura() {
-        if (!bloqueContinuarLectura || !listaContinuarLectura) {
+        if (!bloqueContinuarLectura || !listaContinuarLectura || !bloqueLecturasCompletadas || !listaLecturasCompletadas) {
             return;
         }
 
         listaContinuarLectura.innerHTML = "";
+        listaLecturasCompletadas.innerHTML = "";
         const prestamos = Array.isArray(prestamosLecturaActiva) ? prestamosLecturaActiva : [];
         const lecturasLibres = obtenerLecturasLibresContinuar();
-        if (prestamos.length === 0 && lecturasLibres.length === 0) {
-            bloqueContinuarLectura.hidden = true;
-            return;
-        }
-
-        bloqueContinuarLectura.hidden = false;
+        const prestamosOcultos = new Set(cargarPrestamosOcultos());
+        let totalContinuar = 0;
+        let totalCompletados = 0;
 
         for (const prestamo of prestamos) {
-            const paginaActual = Math.max(1, Number(prestamo.pagina_lectura_actual) || 1);
-            const totalPaginas = Math.max(1, Number(prestamo.paginas_lectura_totales) || 1);
-            const porcentaje = totalPaginas > 1
-                ? Math.min(100, Math.max(1, Math.round((paginaActual / totalPaginas) * 100)))
-                : 0;
-            const textoProgreso = totalPaginas > 1
-                ? `Pagina ${paginaActual} de ${totalPaginas} (${porcentaje}% completado)`
-                : `Pagina guardada: ${paginaActual}`;
+            const progreso = calcularEstadoProgresoLectura(
+                prestamo.pagina_lectura_actual,
+                prestamo.paginas_lectura_totales
+            );
+            const idPrestamo = Number(prestamo.id);
+            const estaCompleto = progreso.completo;
 
             const elemento = document.createElement("li");
             elemento.innerHTML = `
@@ -1303,26 +1399,35 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
                     <div class="continuar-lectura-texto">
                         <strong>${escaparHtml(prestamo.titulo)} - ${escaparHtml(prestamo.autor)}</strong>
                         <p class="pequeno">Dueno: ${escaparHtml(prestamo.nombre_dueno || "No disponible")}</p>
-                        <p class="pequeno">${escaparHtml(textoProgreso)}</p>
+                        <p class="pequeno">${escaparHtml(progreso.texto)}</p>
                     </div>
                     <div class="continuar-lectura-accion">
                         <button type="button" data-id-prestamo-continuar="${prestamo.id}">Continuar</button>
+                        <button type="button" class="boton-secundario" data-id-prestamo-ocultar="${prestamo.id}">Dejar de seguir</button>
                     </div>
                 </div>
             `;
-            listaContinuarLectura.appendChild(elemento);
+
+            if (prestamosOcultos.has(idPrestamo)) {
+                continue;
+            }
+
+            if (estaCompleto) {
+                totalCompletados++;
+                listaLecturasCompletadas.appendChild(elemento);
+            } else {
+                totalContinuar++;
+                listaContinuarLectura.appendChild(elemento);
+            }
         }
 
         for (const lecturaLibre of lecturasLibres) {
-            const paginaActual = Math.max(1, Number(lecturaLibre.pagina_actual) || 1);
-            const totalPaginas = Math.max(1, Number(lecturaLibre.total_paginas) || 1);
-            const porcentaje = totalPaginas > 1
-                ? Math.min(100, Math.max(1, Math.round((paginaActual / totalPaginas) * 100)))
-                : 0;
+            const progreso = calcularEstadoProgresoLectura(
+                lecturaLibre.pagina_actual,
+                lecturaLibre.total_paginas
+            );
             const idioma = String(lecturaLibre.idioma || "es").toLowerCase() === "en" ? "EN" : "ES";
-            const textoProgreso = totalPaginas > 1
-                ? `Pagina ${paginaActual} de ${totalPaginas} (${porcentaje}% completado)`
-                : `Pagina guardada: ${paginaActual}`;
+            const estaCompleto = progreso.completo;
 
             const elemento = document.createElement("li");
             elemento.innerHTML = `
@@ -1330,16 +1435,26 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
                     ${bloquePortada(lecturaLibre)}
                     <div class="continuar-lectura-texto">
                         <strong>${escaparHtml(lecturaLibre.titulo)} - ${escaparHtml(lecturaLibre.autor)}</strong>
-                        <p class="pequeno">Catálogo gratuito | Idioma: ${idioma}</p>
-                        <p class="pequeno">${escaparHtml(textoProgreso)}</p>
+                        <p class="pequeno">Cat?logo gratuito | Idioma: ${idioma}</p>
+                        <p class="pequeno">${escaparHtml(progreso.texto)}</p>
                     </div>
                     <div class="continuar-lectura-accion">
                         <button type="button" data-id-libro-libre-continuar="${escaparHtml(lecturaLibre.id_externo)}">Continuar</button>
+                        <button type="button" class="boton-secundario" data-id-libro-libre-ocultar="${escaparHtml(lecturaLibre.id_externo)}">Dejar de seguir</button>
                     </div>
                 </div>
             `;
-            listaContinuarLectura.appendChild(elemento);
+            if (estaCompleto) {
+                totalCompletados++;
+                listaLecturasCompletadas.appendChild(elemento);
+            } else {
+                totalContinuar++;
+                listaContinuarLectura.appendChild(elemento);
+            }
         }
+
+        bloqueContinuarLectura.hidden = totalContinuar === 0;
+        bloqueLecturasCompletadas.hidden = totalCompletados === 0;
     }
 
     function renderizarMisPrestamos(prestamos) {
@@ -1504,6 +1619,8 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         }
 
         const usuario = datosSesion.usuario;
+        idUsuarioActivo = Math.max(0, Number(usuario.id) || 0);
+        avisoCapturaMostrado = false;
         nombreUsuarioActivo.textContent = `${usuario.nombre} ${usuario.apellidos}`;
         telefonoUsuarioAjustes.value = usuario.telefono || "";
         pintarEstadoTelegram(usuario);
@@ -1567,13 +1684,8 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         evento.preventDefault();
         limpiarMensaje();
         const formulario = evento.currentTarget;
-        const datos = {
-            titulo: formulario.titulo.value,
-            autor: formulario.autor.value,
-            genero: formulario.genero.value,
-            portada_url: formulario.portada_url.value.trim(),
-            descripcion: formulario.descripcion.value
-        };
+        const datos = new FormData(formulario);
+        datos.set("portada_url", formulario.portada_url.value.trim());
 
         try {
             await window.fabularia.llamarApi("/libros", "POST", datos);
@@ -1804,6 +1916,17 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
     }
 
     document.addEventListener("keydown", (evento) => {
+        if (evento.key === "PrintScreen") {
+            evento.preventDefault();
+            mostrarAvisoCapturaIlegal();
+            return;
+        }
+
+        const tecla = String(evento.key || "").toLowerCase();
+        if ((evento.metaKey || evento.ctrlKey) && evento.shiftKey && tecla === "s") {
+            mostrarAvisoCapturaIlegal();
+        }
+
         if (evento.key === "Escape" && !modalLectorLibro.hidden) {
             cerrarLector();
             return;
@@ -1830,15 +1953,15 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
             return;
         }
 
-        if (evento.key === "PrintScreen") {
-            evento.preventDefault();
-            mostrarMensaje("Capturas de pantalla deshabilitadas en este modo de lectura.", "error", 2500);
-            return;
-        }
-
         if ((evento.ctrlKey || evento.metaKey) && ["c", "x", "s", "p", "a", "u"].includes(evento.key.toLowerCase())) {
             evento.preventDefault();
             mostrarMensaje("Accion bloqueada en modo lectura protegido.", "error", 2200);
+        }
+    });
+
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden" && !modalLectorLibro.hidden) {
+            mostrarAvisoCapturaIlegal();
         }
     });
 
@@ -1943,7 +2066,23 @@ document.getElementById("botonCerrarSesionRapido").addEventListener("click", asy
         }
     });
 
-    listaContinuarLectura.addEventListener("click", async (evento) => {
+    async function manejarClickContinuarLectura(evento) {
+        const botonOcultarPrestamo = evento.target.closest("button[data-id-prestamo-ocultar]");
+        if (botonOcultarPrestamo) {
+            ocultarPrestamoEnContinuar(Number(botonOcultarPrestamo.dataset.idPrestamoOcultar));
+            renderizarContinuarLectura();
+            mostrarMensaje("Se oculto esta lectura de la seccion de seguimiento.", "ok", 2200);
+            return;
+        }
+
+        const botonOcultarLibre = evento.target.closest("button[data-id-libro-libre-ocultar]");
+        if (botonOcultarLibre) {
+            dejarDeSeguirLecturaLibre(String(botonOcultarLibre.dataset.idLibroLibreOcultar || ""));
+            renderizarContinuarLectura();
+            mostrarMensaje("Se elimino este libro del seguimiento de lectura.", "ok", 2200);
+            return;
+        }
+
         const botonLibre = evento.target.closest("button[data-id-libro-libre-continuar]");
         if (botonLibre) {
             const idExterno = String(botonLibre.dataset.idLibroLibreContinuar || "");
@@ -1974,6 +2113,14 @@ document.getElementById("botonCerrarSesionRapido").addEventListener("click", asy
         } catch (error) {
             mostrarMensaje(error.message, "error");
         }
+    }
+
+    listaContinuarLectura.addEventListener("click", (evento) => {
+        void manejarClickContinuarLectura(evento);
+    });
+
+    listaLecturasCompletadas.addEventListener("click", (evento) => {
+        void manejarClickContinuarLectura(evento);
     });
 
     botonDesvincularTelegram.addEventListener("click", async () => {

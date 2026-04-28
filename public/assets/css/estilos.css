@@ -671,7 +671,13 @@ button:hover {
 }
 
 .catalogo-filtros--libre {
-    grid-template-columns: minmax(0, 1fr) 160px;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) 160px;
+}
+
+.catalogo-filtros--libre > button {
+    width: 160px;
+    min-width: 160px;
+    justify-self: end;
 }
 
 .catalogo-filtro-grupo label {
@@ -701,10 +707,14 @@ button:hover {
     gap: 0.65rem;
     align-items: start;
     min-width: 0;
+    height: 100%;
 }
 
 .catalogo-card-cuerpo {
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
 }
 
 .catalogo-card .portada-wrap {
@@ -782,7 +792,8 @@ button:hover {
 }
 
 .catalogo-card-acciones {
-    margin-top: 0.65rem;
+    margin-top: auto;
+    padding-top: 0.65rem;
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
@@ -875,11 +886,23 @@ button:hover {
     display: flex;
     justify-content: flex-end;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 0.45rem;
 }
 
 .continuar-lectura-accion button {
     width: auto;
     min-width: 130px;
+}
+
+.boton-compacto {
+    width: auto;
+    min-width: 190px;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    padding-left: 1.1rem;
+    padding-right: 1.1rem;
 }
 
 .subcard--peligro {
@@ -1367,6 +1390,12 @@ button:hover {
 
     .catalogo-filtros--libre {
         grid-template-columns: 1fr;
+    }
+
+    .catalogo-filtros--libre > button {
+        width: 100%;
+        min-width: 0;
+        justify-self: stretch;
     }
 
     .catalogo-busqueda-fila {

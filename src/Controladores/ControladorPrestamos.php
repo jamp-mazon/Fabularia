@@ -61,10 +61,7 @@ final class ControladorPrestamos
             return [409, ['error' => 'El libro ya esta prestado actualmente.']];
         }
 
-        $referenciaLectura = $this->servicioLecturaPublica->buscarReferenciaPublica(
-            (string) ($libro['titulo'] ?? ''),
-            (string) ($libro['autor'] ?? '')
-        );
+        $referenciaLectura = $this->servicioLecturaPublica->construirReferenciaEpubPredeterminada($libro);
 
         $idPrestamo = $this->repositorioPrestamos->crearPrestamo(
             $idLibro,
@@ -122,6 +119,15 @@ final class ControladorPrestamos
 
         if ($prestamo['fecha_devolucion'] !== null) {
             return [409, ['error' => 'El prestamo ya fue devuelto y no admite lectura.']];
+        }
+
+        if ((int) ($prestamo['lectura_publica'] ?? 0) !== 1) {
+            $referenciaDemo = $this->servicioLecturaPublica->construirReferenciaEpubPredeterminada($prestamo);
+            $this->repositorioPrestamos->actualizarFuenteLectura($idPrestamo, $idUsuario, $referenciaDemo);
+            $prestamoActualizado = $this->repositorioPrestamos->obtenerPrestamoDeUsuario($idPrestamo, $idUsuario);
+            if ($prestamoActualizado !== null) {
+                $prestamo = $prestamoActualizado;
+            }
         }
 
         try {
@@ -248,7 +254,14 @@ final class ControladorPrestamos
         }
 
         if ((int) ($prestamo['lectura_publica'] ?? 0) !== 1) {
-            return [409, ['error' => 'Este libro no dispone de lectura publica.']];
+            $referenciaDemo = $this->servicioLecturaPublica->construirReferenciaEpubPredeterminada($prestamo);
+            $this->repositorioPrestamos->actualizarFuenteLectura($idPrestamo, $idUsuario, $referenciaDemo);
+            $prestamoActualizado = $this->repositorioPrestamos->obtenerPrestamoDeUsuario($idPrestamo, $idUsuario);
+            if ($prestamoActualizado !== null) {
+                $prestamo = $prestamoActualizado;
+            } else {
+                return [409, ['error' => 'Este libro no dispone de lectura publica.']];
+            }
         }
 
         if ($paginasTotales <= 0) {

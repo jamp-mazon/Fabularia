@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS libros (
     genero VARCHAR(100) NOT NULL,
     portada_url VARCHAR(500) NULL,
     descripcion TEXT NULL,
+    archivo_ruta VARCHAR(500) NULL,
+    archivo_mime VARCHAR(120) NULL,
+    archivo_nombre_original VARCHAR(255) NULL,
     fecha_publicacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     activo_intercambio TINYINT(1) NOT NULL DEFAULT 1,
     CONSTRAINT fk_libro_usuario

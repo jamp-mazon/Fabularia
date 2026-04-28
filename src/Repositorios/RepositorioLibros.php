@@ -9,6 +9,8 @@ use PDO;
 
 final class RepositorioLibros
 {
+    private ?bool $soportaColumnasArchivo = null;
+
     public function __construct(private readonly PDO $conexion)
     {
     }
@@ -19,21 +21,70 @@ final class RepositorioLibros
         string $autor,
         string $genero,
         ?string $portadaUrl,
-        ?string $descripcion
+        ?string $descripcion,
+        ?string $archivoRuta = null,
+        ?string $archivoMime = null,
+        ?string $archivoNombre = null
     ): int {
-        $sql = 'INSERT INTO libros (id_usuario, titulo, autor, genero, portada_url, descripcion, activo_intercambio)
-                VALUES (:id_usuario, :titulo, :autor, :genero, :portada_url, :descripcion, 1)';
-        $sentencia = $this->conexion->prepare($sql);
-        $sentencia->execute([
-            'id_usuario' => $idUsuario,
-            'titulo' => $titulo,
-            'autor' => $autor,
-            'genero' => $genero,
-            'portada_url' => $portadaUrl,
-            'descripcion' => $descripcion,
-        ]);
+        if ($this->soportaColumnasArchivo()) {
+            $sql = 'INSERT INTO libros (
+                        id_usuario, titulo, autor, genero, portada_url, descripcion,
+                        archivo_ruta, archivo_mime, archivo_nombre_original, activo_intercambio
+                    )
+                    VALUES (
+                        :id_usuario, :titulo, :autor, :genero, :portada_url, :descripcion,
+                        :archivo_ruta, :archivo_mime, :archivo_nombre_original, 1
+                    )';
+            $sentencia = $this->conexion->prepare($sql);
+            $sentencia->execute([
+                'id_usuario' => $idUsuario,
+                'titulo' => $titulo,
+                'autor' => $autor,
+                'genero' => $genero,
+                'portada_url' => $portadaUrl,
+                'descripcion' => $descripcion,
+                'archivo_ruta' => $archivoRuta,
+                'archivo_mime' => $archivoMime,
+                'archivo_nombre_original' => $archivoNombre,
+            ]);
+        } else {
+            $sql = 'INSERT INTO libros (id_usuario, titulo, autor, genero, portada_url, descripcion, activo_intercambio)
+                    VALUES (:id_usuario, :titulo, :autor, :genero, :portada_url, :descripcion, 1)';
+            $sentencia = $this->conexion->prepare($sql);
+            $sentencia->execute([
+                'id_usuario' => $idUsuario,
+                'titulo' => $titulo,
+                'autor' => $autor,
+                'genero' => $genero,
+                'portada_url' => $portadaUrl,
+                'descripcion' => $descripcion,
+            ]);
+        }
 
         return (int) $this->conexion->lastInsertId();
+    }
+
+    public function admiteArchivosLibros(): bool
+    {
+        return $this->soportaColumnasArchivo();
+    }
+
+    private function soportaColumnasArchivo(): bool
+    {
+        if ($this->soportaColumnasArchivo !== null) {
+            return $this->soportaColumnasArchivo;
+        }
+
+        $sql = 'SELECT COUNT(*) AS total
+                FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = "libros"
+                  AND COLUMN_NAME IN ("archivo_ruta", "archivo_mime", "archivo_nombre_original")';
+        $sentencia = $this->conexion->query($sql);
+        $total = (int) ($sentencia?->fetchColumn() ?: 0);
+        $this->soportaColumnasArchivo = $total >= 3;
+
+        return $this->soportaColumnasArchivo;
     }
 
     public function obtenerPorId(int $idLibro): ?array

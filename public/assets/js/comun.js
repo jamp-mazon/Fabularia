@@ -10,8 +10,12 @@ window.fabularia = (function () {
     async function llamarApi(ruta, metodo = "GET", datos = null) {
         const opciones = { method: metodo, headers: {} };
         if (datos !== null) {
-            opciones.headers["Content-Type"] = "application/json";
-            opciones.body = JSON.stringify(datos);
+            if (datos instanceof FormData) {
+                opciones.body = datos;
+            } else {
+                opciones.headers["Content-Type"] = "application/json";
+                opciones.body = JSON.stringify(datos);
+            }
         }
 
         const respuesta = await fetch(`${urlBaseApi}${ruta}`, opciones);

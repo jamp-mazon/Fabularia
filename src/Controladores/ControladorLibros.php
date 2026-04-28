@@ -11,6 +11,8 @@ use Monolog\Logger;
 
 final class ControladorLibros
 {
+    private const MAX_BYTES_ARCHIVO_LIBRO = 25_000_000;
+
     public function __construct(
         private readonly RepositorioLibros $repositorioLibros,
         private readonly Logger $logger
@@ -33,6 +35,11 @@ final class ControladorLibros
         $portadaUrl = $portadaUrl === '' ? null : $portadaUrl;
         $descripcion = SolicitudHttp::obtenerTexto($datos, 'descripcion');
         $descripcion = $descripcion === '' ? null : $descripcion;
+        $archivoLibro = $this->procesarArchivoLibro($idUsuario);
+
+        if (($archivoLibro['error'] ?? null) !== null) {
+            return [422, ['error' => (string) $archivoLibro['error']]];
+        }
 
         if ($titulo === '' || $autor === '' || $genero === '') {
             return [422, ['error' => 'Titulo, autor y genero son obligatorios.']];
@@ -48,7 +55,10 @@ final class ControladorLibros
             $autor,
             $genero,
             $portadaUrl,
-            $descripcion
+            $descripcion,
+            $archivoLibro['ruta'] ?? null,
+            $archivoLibro['mime'] ?? null,
+            $archivoLibro['nombre_original'] ?? null
         );
         $this->logger->info('Libro publicado para intercambio', ['id_libro' => $idLibro, 'id_usuario' => $idUsuario]);
 
@@ -62,6 +72,7 @@ final class ControladorLibros
                     'autor' => $autor,
                     'genero' => $genero,
                     'portada_url' => $portadaUrl,
+                    'archivo_subido' => ($archivoLibro['ruta'] ?? null) !== null,
                 ],
             ],
         ];
@@ -139,5 +150,78 @@ final class ControladorLibros
         ]);
 
         return [200, ['mensaje' => 'Libro eliminado correctamente.']];
+    }
+
+    /**
+     * @return array{ruta?: string|null, mime?: string|null, nombre_original?: string|null, error?: string|null}
+     */
+    private function procesarArchivoLibro(int $idUsuario): array
+    {
+        $archivo = $_FILES['archivo_libro'] ?? null;
+        if (!is_array($archivo) || !isset($archivo['error'])) {
+            return ['ruta' => null, 'mime' => null, 'nombre_original' => null];
+        }
+
+        $error = (int) $archivo['error'];
+        if ($error === UPLOAD_ERR_NO_FILE) {
+            return ['ruta' => null, 'mime' => null, 'nombre_original' => null];
+        }
+
+        if (!$this->repositorioLibros->admiteArchivosLibros()) {
+            return ['error' => 'Debes aplicar la migracion database/migracion_archivos_libros.sql antes de subir EPUB/PDF.'];
+        }
+
+        if ($error !== UPLOAD_ERR_OK) {
+            return ['error' => 'No se pudo subir el archivo del libro.'];
+        }
+
+        $tmp = (string) ($archivo['tmp_name'] ?? '');
+        $nombreOriginal = trim((string) ($archivo['name'] ?? 'libro'));
+        $tamano = (int) ($archivo['size'] ?? 0);
+
+        if ($tmp === '' || !is_uploaded_file($tmp)) {
+            return ['error' => 'Archivo subido invalido.'];
+        }
+
+        if ($tamano <= 0 || $tamano > self::MAX_BYTES_ARCHIVO_LIBRO) {
+            return ['error' => 'El archivo debe pesar entre 1 byte y 25 MB.'];
+        }
+
+        $extension = strtolower((string) pathinfo($nombreOriginal, PATHINFO_EXTENSION));
+        $permitidas = ['epub', 'pdf'];
+        if (!in_array($extension, $permitidas, true)) {
+            return ['error' => 'Solo se permiten archivos EPUB o PDF.'];
+        }
+
+        $mimeDetectado = (string) (mime_content_type($tmp) ?: '');
+        $mimesPermitidos = [
+            'epub' => ['application/epub+zip', 'application/zip'],
+            'pdf' => ['application/pdf'],
+        ];
+
+        if ($mimeDetectado !== '' && !in_array($mimeDetectado, $mimesPermitidos[$extension], true)) {
+            return ['error' => 'El tipo de archivo no coincide con un EPUB/PDF valido.'];
+        }
+
+        $directorioBase = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'libros';
+        $subdirectorioUsuario = $directorioBase . DIRECTORY_SEPARATOR . 'usuario_' . max(1, $idUsuario);
+        if (!is_dir($subdirectorioUsuario) && !mkdir($subdirectorioUsuario, 0777, true) && !is_dir($subdirectorioUsuario)) {
+            return ['error' => 'No se pudo preparar el directorio de subida.'];
+        }
+
+        $nombreSeguro = bin2hex(random_bytes(16)) . '.' . $extension;
+        $rutaDestino = $subdirectorioUsuario . DIRECTORY_SEPARATOR . $nombreSeguro;
+
+        if (!move_uploaded_file($tmp, $rutaDestino)) {
+            return ['error' => 'No se pudo guardar el archivo subido.'];
+        }
+
+        $rutaRelativa = 'storage/libros/usuario_' . max(1, $idUsuario) . '/' . $nombreSeguro;
+
+        return [
+            'ruta' => $rutaRelativa,
+            'mime' => $mimeDetectado !== '' ? $mimeDetectado : null,
+            'nombre_original' => $nombreOriginal !== '' ? $nombreOriginal : null,
+        ];
     }
 }
