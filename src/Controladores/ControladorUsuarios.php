@@ -35,23 +35,23 @@ final class ControladorUsuarios
         $confirmarContrasena = SolicitudHttp::obtenerTexto($datos, 'confirmar_contrasena');
 
         if ($nombre === '' || $apellidos === '' || $email === '' || $contrasena === '') {
-            return [422, ['error' => 'Nombre, apellidos, email y contrasena son obligatorios.']];
+            return [422, ['error' => 'Nombre, apellidos, email y contraseña son obligatorios.']];
         }
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return [422, ['error' => 'El email no tiene un formato valido.']];
+            return [422, ['error' => 'El email no tiene un formato válido.']];
         }
 
         if ($telefono !== null && !$this->telefonoValido($telefono)) {
-            return [422, ['error' => 'El telefono no tiene un formato valido.']];
+            return [422, ['error' => 'El teléfono no tiene un formato válido.']];
         }
 
         if (mb_strlen($contrasena) < 6) {
-            return [422, ['error' => 'La contrasena debe tener al menos 6 caracteres.']];
+            return [422, ['error' => 'La contraseña debe tener al menos 6 caracteres.']];
         }
 
         if ($confirmarContrasena !== '' && $confirmarContrasena !== $contrasena) {
-            return [422, ['error' => 'La confirmacion de contrasena no coincide.']];
+            return [422, ['error' => 'La confirmación de contraseña no coincide.']];
         }
 
         if ($this->repositorioUsuarios->obtenerPorEmail($email) !== null) {
@@ -99,7 +99,7 @@ final class ControladorUsuarios
         $contrasena = SolicitudHttp::obtenerTexto($datos, 'contrasena');
 
         if ($email === '' || $contrasena === '') {
-            return [422, ['error' => 'Debes indicar email y contrasena.']];
+            return [422, ['error' => 'Debes indicar email y contraseña.']];
         }
 
         $usuario = $this->repositorioUsuarios->obtenerPorEmail($email);
@@ -110,12 +110,12 @@ final class ControladorUsuarios
         $_SESSION['id_usuario'] = (int) $usuario['id'];
         $_SESSION['nombre_usuario'] = trim((string) $usuario['nombre'] . ' ' . (string) $usuario['apellidos']);
 
-        $this->logger->info('Inicio de sesion correcto', ['id_usuario' => (int) $usuario['id']]);
+        $this->logger->info('Inicio de sesión correcto', ['id_usuario' => (int) $usuario['id']]);
 
         return [
             200,
             [
-                'mensaje' => 'Sesion iniciada.',
+                'mensaje' => 'Sesión iniciada.',
                 'usuario' => [
                     'id' => (int) $usuario['id'],
                     'nombre' => (string) $usuario['nombre'],
@@ -135,7 +135,7 @@ final class ControladorUsuarios
     public function cerrarSesion(): array
     {
         unset($_SESSION['id_usuario'], $_SESSION['nombre_usuario']);
-        return [200, ['mensaje' => 'Sesion cerrada correctamente.']];
+        return [200, ['mensaje' => 'Sesión cerrada correctamente.']];
     }
 
     /**
@@ -164,7 +164,7 @@ final class ControladorUsuarios
     {
         $idUsuario = (int) ($_SESSION['id_usuario'] ?? 0);
         if ($idUsuario <= 0) {
-            return [401, ['error' => 'Debes iniciar sesion para cambiar la contrasena.']];
+            return [401, ['error' => 'Debes iniciar sesión para cambiar la contraseña.']];
         }
 
         $datos = SolicitudHttp::obtenerDatosEntrada();
@@ -173,28 +173,28 @@ final class ControladorUsuarios
         $confirmarContrasena = SolicitudHttp::obtenerTexto($datos, 'confirmar_contrasena');
 
         if ($contrasenaActual === '' || $contrasenaNueva === '' || $confirmarContrasena === '') {
-            return [422, ['error' => 'Debes completar todos los campos de contrasena.']];
+            return [422, ['error' => 'Debes completar todos los campos de contraseña.']];
         }
 
         if ($contrasenaNueva !== $confirmarContrasena) {
-            return [422, ['error' => 'La nueva contrasena y su confirmacion no coinciden.']];
+            return [422, ['error' => 'La nueva contraseña y su confirmación no coinciden.']];
         }
 
         if (mb_strlen($contrasenaNueva) < 6) {
-            return [422, ['error' => 'La nueva contrasena debe tener al menos 6 caracteres.']];
+            return [422, ['error' => 'La nueva contraseña debe tener al menos 6 caracteres.']];
         }
 
         $contrasenaHashActual = $this->repositorioUsuarios->obtenerContrasenaHashPorId($idUsuario);
         if ($contrasenaHashActual === null) {
-            return [404, ['error' => 'No se encontro el usuario autenticado.']];
+            return [404, ['error' => 'No se encontró el usuario autenticado.']];
         }
 
         if (!password_verify($contrasenaActual, $contrasenaHashActual)) {
-            return [401, ['error' => 'La contrasena actual es incorrecta.']];
+            return [401, ['error' => 'La contraseña actual es incorrecta.']];
         }
 
         if (password_verify($contrasenaNueva, $contrasenaHashActual)) {
-            return [422, ['error' => 'La nueva contrasena no puede ser igual a la actual.']];
+            return [422, ['error' => 'La nueva contraseña no puede ser igual a la actual.']];
         }
 
         $actualizado = $this->repositorioUsuarios->actualizarContrasena(
@@ -203,12 +203,12 @@ final class ControladorUsuarios
         );
 
         if (!$actualizado) {
-            return [404, ['error' => 'No se pudo actualizar la contrasena del usuario.']];
+            return [404, ['error' => 'No se pudo actualizar la contraseña del usuario.']];
         }
 
-        $this->logger->info('Contrasena actualizada', ['id_usuario' => $idUsuario]);
+        $this->logger->info('Contraseña actualizada', ['id_usuario' => $idUsuario]);
 
-        return [200, ['mensaje' => 'Contrasena actualizada correctamente.']];
+        return [200, ['mensaje' => 'Contraseña actualizada correctamente.']];
     }
 
     /**
@@ -220,7 +220,7 @@ final class ControladorUsuarios
         $email = mb_strtolower(SolicitudHttp::obtenerTexto($datos, 'email'));
 
         if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return [200, ['mensaje' => 'Si el email existe, recibiras instrucciones para restablecer la contrasena.']];
+            return [200, ['mensaje' => 'Si el email existe, recibirás instrucciones para restablecer la contraseña.']];
         }
 
         $usuario = $this->repositorioUsuarios->obtenerPorEmail($email);
@@ -250,7 +250,7 @@ final class ControladorUsuarios
 
                 $enviado = $this->servicioCorreo->enviarCorreoHtml(
                     (string) $usuario['email'],
-                    'Fabularia - Restablecer contrasena',
+                    'Fabularia - Restablecer contraseña',
                     $html,
                     $textoPlano
                 );
@@ -267,14 +267,14 @@ final class ControladorUsuarios
                     ]);
                 }
             } catch (\Throwable $excepcion) {
-                $this->logger->error('Error al solicitar restablecimiento de contrasena', [
+                $this->logger->error('Error al solicitar restablecimiento de contraseña', [
                     'email' => $email,
                     'mensaje' => $excepcion->getMessage(),
                 ]);
             }
         }
 
-        return [200, ['mensaje' => 'Si el email existe, recibiras instrucciones para restablecer la contrasena.']];
+        return [200, ['mensaje' => 'Si el email existe, recibirás instrucciones para restablecer la contraseña.']];
     }
 
     /**
@@ -288,31 +288,31 @@ final class ControladorUsuarios
         $confirmarContrasena = SolicitudHttp::obtenerTexto($datos, 'confirmar_contrasena');
 
         if ($token === '' || $contrasenaNueva === '' || $confirmarContrasena === '') {
-            return [422, ['error' => 'Debes completar token, nueva contrasena y su confirmacion.']];
+            return [422, ['error' => 'Debes completar token, nueva contraseña y su confirmación.']];
         }
 
         if ($contrasenaNueva !== $confirmarContrasena) {
-            return [422, ['error' => 'La nueva contrasena y su confirmacion no coinciden.']];
+            return [422, ['error' => 'La nueva contraseña y su confirmación no coinciden.']];
         }
 
         if (mb_strlen($contrasenaNueva) < 6) {
-            return [422, ['error' => 'La nueva contrasena debe tener al menos 6 caracteres.']];
+            return [422, ['error' => 'La nueva contraseña debe tener al menos 6 caracteres.']];
         }
 
         $tokenHash = hash('sha256', $token);
         $tokenPersistido = $this->repositorioUsuarios->obtenerTokenRestablecimientoValido($tokenHash);
         if ($tokenPersistido === null) {
-            return [400, ['error' => 'El enlace de restablecimiento no es valido o ha caducado.']];
+            return [400, ['error' => 'El enlace de restablecimiento no es válido o ha caducado.']];
         }
 
         $idUsuario = (int) $tokenPersistido['id_usuario'];
         $contrasenaHashActual = $this->repositorioUsuarios->obtenerContrasenaHashPorId($idUsuario);
         if ($contrasenaHashActual === null) {
-            return [404, ['error' => 'No se encontro el usuario de este enlace.']];
+            return [404, ['error' => 'No se encontró el usuario de este enlace.']];
         }
 
         if (password_verify($contrasenaNueva, $contrasenaHashActual)) {
-            return [422, ['error' => 'La nueva contrasena no puede ser igual a la actual.']];
+            return [422, ['error' => 'La nueva contraseña no puede ser igual a la actual.']];
         }
 
         $actualizado = $this->repositorioUsuarios->actualizarContrasena(
@@ -321,17 +321,17 @@ final class ControladorUsuarios
         );
 
         if (!$actualizado) {
-            return [404, ['error' => 'No se pudo actualizar la contrasena.']];
+            return [404, ['error' => 'No se pudo actualizar la contraseña.']];
         }
 
         $this->repositorioUsuarios->marcarTokenRestablecimientoComoUsado((int) $tokenPersistido['id']);
         $this->repositorioUsuarios->invalidarTokensActivosPorUsuario($idUsuario);
 
-        $this->logger->info('Contrasena restablecida con token', [
+        $this->logger->info('Contraseña restablecida con token', [
             'id_usuario' => $idUsuario,
         ]);
 
-        return [200, ['mensaje' => 'Contrasena restablecida correctamente. Ya puedes iniciar sesion.']];
+        return [200, ['mensaje' => 'Contraseña restablecida correctamente. Ya puedes iniciar sesión.']];
     }
 
     /**
@@ -341,7 +341,7 @@ final class ControladorUsuarios
     {
         $idUsuario = (int) ($_SESSION['id_usuario'] ?? 0);
         if ($idUsuario <= 0) {
-            return [401, ['error' => 'Debes iniciar sesion para actualizar el telefono.']];
+            return [401, ['error' => 'Debes iniciar sesión para actualizar el teléfono.']];
         }
 
         $datos = SolicitudHttp::obtenerDatosEntrada();
@@ -349,25 +349,25 @@ final class ControladorUsuarios
         $telefono = $telefono === '' ? null : $telefono;
 
         if ($telefono !== null && !$this->telefonoValido($telefono)) {
-            return [422, ['error' => 'El telefono no tiene un formato valido.']];
+            return [422, ['error' => 'El teléfono no tiene un formato válido.']];
         }
 
         $usuario = $this->repositorioUsuarios->obtenerPorId($idUsuario);
         if ($usuario === null) {
-            return [404, ['error' => 'No se encontro el usuario autenticado.']];
+            return [404, ['error' => 'No se encontró el usuario autenticado.']];
         }
 
         $actualizado = $this->repositorioUsuarios->actualizarTelefono($idUsuario, $telefono);
         if (!$actualizado && (($usuario['telefono'] ?? null) !== $telefono)) {
-            return [404, ['error' => 'No se pudo actualizar el telefono.']];
+            return [404, ['error' => 'No se pudo actualizar el teléfono.']];
         }
 
-        $this->logger->info('Telefono actualizado por el usuario', [
+        $this->logger->info('Teléfono actualizado por el usuario', [
             'id_usuario' => $idUsuario,
             'telefono' => $telefono,
         ]);
 
-        return [200, ['mensaje' => 'Telefono actualizado correctamente.', 'telefono' => $telefono]];
+        return [200, ['mensaje' => 'Teléfono actualizado correctamente.', 'telefono' => $telefono]];
     }
 
     /**
@@ -377,12 +377,12 @@ final class ControladorUsuarios
     {
         $idUsuario = (int) ($_SESSION['id_usuario'] ?? 0);
         if ($idUsuario <= 0) {
-            return [401, ['error' => 'Debes iniciar sesion para desvincular Telegram.']];
+            return [401, ['error' => 'Debes iniciar sesión para desvincular Telegram.']];
         }
 
         $usuario = $this->repositorioUsuarios->obtenerPorId($idUsuario);
         if ($usuario === null) {
-            return [404, ['error' => 'No se encontro el usuario autenticado.']];
+            return [404, ['error' => 'No se encontró el usuario autenticado.']];
         }
 
         $this->repositorioUsuarios->desvincularTelegram($idUsuario);
@@ -398,22 +398,22 @@ final class ControladorUsuarios
     {
         $idUsuario = (int) ($_SESSION['id_usuario'] ?? 0);
         if ($idUsuario <= 0) {
-            return [401, ['error' => 'Debes iniciar sesion para eliminar la cuenta.']];
+            return [401, ['error' => 'Debes iniciar sesión para eliminar la cuenta.']];
         }
 
         $datos = SolicitudHttp::obtenerDatosEntrada();
         $contrasena = SolicitudHttp::obtenerTexto($datos, 'contrasena');
         if ($contrasena === '') {
-            return [422, ['error' => 'Debes indicar tu contrasena para eliminar la cuenta.']];
+            return [422, ['error' => 'Debes indicar tu contraseña para eliminar la cuenta.']];
         }
 
         $contrasenaHashActual = $this->repositorioUsuarios->obtenerContrasenaHashPorId($idUsuario);
         if ($contrasenaHashActual === null) {
-            return [404, ['error' => 'No se encontro el usuario autenticado.']];
+            return [404, ['error' => 'No se encontró el usuario autenticado.']];
         }
 
         if (!password_verify($contrasena, $contrasenaHashActual)) {
-            return [401, ['error' => 'La contrasena es incorrecta.']];
+            return [401, ['error' => 'La contraseña es incorrecta.']];
         }
 
         $eliminado = $this->repositorioUsuarios->eliminarCuentaConDependencias($idUsuario);
@@ -436,16 +436,28 @@ final class ControladorUsuarios
     {
         $nombreHtml = htmlspecialchars($nombre !== '' ? $nombre : 'Usuario', ENT_QUOTES, 'UTF-8');
         $enlaceHtml = htmlspecialchars($enlace, ENT_QUOTES, 'UTF-8');
+        $logoCorreo = rtrim($this->urlBaseAplicacion, '/') . '/assets/img/logo-fabularia-solo-crop-web.png';
+        $rutaLogoLocal = dirname(__DIR__, 2) . '/public/assets/img/logo-fabularia-solo-crop-web.png';
+        if (is_file($rutaLogoLocal) && is_readable($rutaLogoLocal)) {
+            $contenidoLogo = @file_get_contents($rutaLogoLocal);
+            if ($contenidoLogo !== false && $contenidoLogo !== '') {
+                $logoCorreo = 'data:image/png;base64,' . base64_encode($contenidoLogo);
+            }
+        }
+        $logoCorreoHtml = htmlspecialchars($logoCorreo, ENT_QUOTES, 'UTF-8');
 
         return <<<HTML
 <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.5;">
-    <h2 style="margin-bottom: 12px;">Restablecimiento de contrasena - Fabularia</h2>
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom: 16px;">
+        <img src="{$logoCorreoHtml}" alt="Logo Fabularia" style="width:44px; height:44px; border-radius:10px; border:1px solid #d7e0ee;">
+        <h2 style="margin:0;">Restablecimiento de contraseña - Fabularia</h2>
+    </div>
     <p>Hola {$nombreHtml},</p>
-    <p>Hemos recibido una solicitud para restablecer tu contrasena.</p>
-    <p>Este enlace estara disponible durante {$minutos} minutos:</p>
+    <p>Hemos recibido una solicitud para restablecer tu contraseña.</p>
+    <p>Este enlace estará disponible durante {$minutos} minutos:</p>
     <p>
         <a href="{$enlaceHtml}" style="display:inline-block; padding:10px 14px; background:#0f766e; color:#ffffff; text-decoration:none; border-radius:8px;">
-            Restablecer contrasena
+            Restablecer contraseña
         </a>
     </p>
     <p>Si no solicitaste este cambio, ignora este correo.</p>
@@ -458,8 +470,8 @@ HTML;
         $saludo = $nombre !== '' ? $nombre : 'Usuario';
 
         return "Hola {$saludo},\n\n"
-            . "Hemos recibido una solicitud para restablecer tu contrasena de Fabularia.\n"
-            . "Este enlace estara disponible durante {$minutos} minutos:\n\n"
+            . "Hemos recibido una solicitud para restablecer tu contraseña de Fabularia.\n"
+            . "Este enlace estará disponible durante {$minutos} minutos:\n\n"
             . $enlace . "\n\n"
             . "Si no solicitaste este cambio, ignora este correo.\n";
     }

@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS prestamos (
     paginas_lectura_totales INT UNSIGNED NULL,
     fecha_actualizacion_lectura DATETIME NULL,
     fecha_prestamo DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_limite_devolucion DATETIME NULL,
     fecha_devolucion DATETIME NULL,
     CONSTRAINT fk_prestamo_libro
         FOREIGN KEY (id_libro) REFERENCES libros(id)

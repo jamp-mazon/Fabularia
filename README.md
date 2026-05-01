@@ -1,60 +1,101 @@
 # Fabularia - Intercambio de Libros
 
-Aplicacion en PHP con API REST y formularios para gestionar:
+Fabularia es una aplicacion web en PHP orientada a intercambio de libros entre usuarios.
+Incluye API REST, autenticacion, prestamos con reglas de negocio, integracion con Telegram/n8n,
+lectura en plataforma (catalogo libre y archivos EPUB/PDF subidos por usuarios), y panel responsive.
 
-- Registro e inicio de sesion de usuarios (con nombre, apellidos y telefono opcional).
-- Publicacion de libros por parte de cada usuario (con portada opcional por URL).
-- Autocompletado de libros desde catalogo global (Google Books en español).
-- Busqueda de libros disponibles para intercambio con filtro por genero.
-- Solicitud y devolucion de prestamos.
-- Notificacion a n8n cuando se crea un prestamo (para automatizar Telegram).
-- Lector para prestamos con pagina guardada y barra de progreso (solo si hay fuente publica).
+## Stack tecnico
 
-El proyecto utiliza Composer con:
-
-- `vlucas/phpdotenv` para variables de entorno.
-- `monolog/monolog` para registro de eventos en `logs/app.log`.
-
-## Requisitos
-
-- PHP 8.1 o superior
+- PHP 8.1+
 - MySQL/MariaDB
 - Composer
-- Apache con `mod_rewrite` (recomendado)
+- Frontend server-rendered (HTML/CSS/JS sin framework)
+
+Dependencias Composer:
+
+- `vlucas/phpdotenv`: variables de entorno
+- `monolog/monolog`: logging de aplicacion
+- `phpmailer/phpmailer`: envio SMTP (recuperacion de contrasena)
+- `smalot/pdfparser`: extraccion de texto PDF
+- `nelexa/zip`: lectura EPUB sin depender de `ZipArchive`
+
+## Funcionalidades principales
+
+- Registro/login/logout de usuarios con nombre, apellidos, email y telefono opcional.
+- Cambio de contrasena y eliminacion de cuenta.
+- Recuperacion de contrasena por email (token temporal).
+- Vinculacion Telegram (bot + webhook n8n).
+- Publicacion de libros con portada URL y archivo opcional EPUB/PDF.
+- Catalogo de libros de usuarios (intercambio 1:1).
+- Catalogo de libros gratuitos (ES/EN) con lectura y progreso.
+- Solicitud y devolucion de prestamos.
+- Fecha limite de devolucion (maximo 14 dias desde hoy).
+- Lector con pagina guardada, barra de progreso y seguimiento en "Mis libros".
+- Acciones de seguimiento: continuar lectura, dejar de seguir, devolver y liberar libro.
+
+## Reglas de negocio clave
+
+- Un usuario no puede pedirse prestado su propio libro.
+- Para pedir un libro de otro usuario debe tener al menos un libro propio disponible.
+- Si un libro esta prestado, no aparece como disponible para nuevos prestamos.
+- Al devolver el prestamo, el libro vuelve a estar disponible en catalogo.
+- La fecha limite del prestamo no puede superar 14 dias desde la fecha actual.
 
 ## Instalacion
 
-1. Instala dependencias:
+1. Instalar dependencias:
 
 ```bash
 composer install
 ```
 
-2. Crea el archivo de entorno:
+2. Crear entorno:
 
 ```bash
 cp .env.example .env
 ```
 
-3. Ajusta los datos de conexion en `.env`.
-   Configura tambien:
+3. Configurar `.env` (sin subir secretos a Git):
 
 ```dotenv
+APP_TIMEZONE=Europe/Madrid
+APP_URL_BASE=http://localhost/Fabularia/public
+
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_NAME=fabularia
+DB_USER=root
+DB_PASS=
+
 N8N_WEBHOOK_PRESTAMO=
 TELEGRAM_BOT_URL_BASE=
 TELEGRAM_VINCULACION_TOKEN=
 GOOGLE_BOOKS_API_KEY=
+
+MAIL_FROM_EMAIL=no-reply@fabularia.local
+MAIL_FROM_NAME=Fabularia
+MAIL_DRIVER=smtp
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASS=
+SMTP_ENCRYPTION=tls
+SMTP_AUTH=true
+SMTP_TIMEOUT=20
+
+PASSWORD_RESET_TTL_MINUTES=30
+LECTURA_CACHE_DIR=
 ```
 
-`GOOGLE_BOOKS_API_KEY` es opcional, pero recomendado para limites de uso mas altos del catalogo externo.
+## Base de datos
 
-4. Crea la base de datos y aplica el esquema:
+Aplicar esquema completo:
 
 ```sql
 SOURCE database/schema.sql;
 ```
 
-Si ya tenias tablas creadas antes de este cambio, aplica tambien:
+Si vienes de una version anterior, aplica tambien migraciones pendientes:
 
 ```sql
 SOURCE database/migracion_apellidos_genero.sql;
@@ -62,106 +103,99 @@ SOURCE database/migracion_telefono_usuarios.sql;
 SOURCE database/migracion_telegram_usuarios.sql;
 SOURCE database/migracion_portada_libros.sql;
 SOURCE database/migracion_lectura_publica_prestamos.sql;
+SOURCE database/migracion_archivos_libros.sql;
+SOURCE database/migracion_restablecimiento_contrasena.sql;
+SOURCE database/migracion_fecha_limite_prestamos.sql;
 ```
 
-5. Sirve la carpeta `public/` como raiz web o accede a:
+## Ejecucion local
+
+Servir `public/` como raiz web o abrir:
 
 ```text
 http://localhost/Fabularia/public/
 ```
 
-Rutas de interfaz:
+Vistas:
 
 - `GET /login`
 - `GET /registro`
+- `GET /recuperar-contrasena`
+- `GET /restablecer-contrasena?token=...`
 - `GET /app`
 
 ## API REST (resumen)
+
+Usuarios:
 
 - `POST /api/usuarios/registro`
 - `POST /api/usuarios/login`
 - `POST /api/usuarios/logout`
 - `GET /api/usuarios/yo`
+- `POST /api/usuarios/telefono`
 - `POST /api/usuarios/cambiar-contrasena`
+- `POST /api/usuarios/solicitar-restablecimiento`
+- `POST /api/usuarios/restablecer-contrasena`
 - `POST /api/usuarios/telegram/desvincular`
 - `DELETE /api/usuarios/cuenta`
-- `GET /api/catalogo/sugerencias?texto=harry`
-- `GET /api/catalogo/libre?texto=quijote` (catalogo gratuito ES/EN)
-- `GET /api/catalogo/libre/lectura?id_externo=123&pagina=1`
+
+Catalogo:
+
+- `GET /api/catalogo/sugerencias?texto=...`
+- `GET /api/catalogo/libre?texto=...&genero=...&pagina_es=1&pagina_en=1`
+- `GET /api/catalogo/libre/lectura?id_externo=...&pagina=...`
+
+Telegram:
+
 - `POST /api/telegram/vincular`
+
+Libros:
+
 - `POST /api/libros`
-- `GET /api/libros?buscar=texto&genero=Novela`
+- `GET /api/libros?buscar=...&genero=...`
 - `GET /api/libros/mios`
 - `DELETE /api/libros` (JSON: `id_libro`)
-- `POST /api/prestamos`
+
+Prestamos:
+
+- `POST /api/prestamos` (acepta `fecha_limite_devolucion` en formato `Y-m-d`)
 - `GET /api/prestamos/mios`
-- `GET /api/prestamos/lectura?id_prestamo=10&pagina=2`
+- `GET /api/prestamos/lectura?id_prestamo=...&pagina=...`
 - `POST /api/prestamos/lectura/progreso`
 - `POST /api/prestamos/devolver`
 
-Reglas de negocio de catalogo:
+## Integracion Telegram + n8n
 
-- **Catalogo gratuito**: lectura directa sin regla 1:1 (idiomas permitidos ES/EN con aviso visual).
-- **Catalogo de usuarios**: para solicitar prestamo se exige tener al menos un libro propio disponible para intercambio.
+- El usuario abre el bot con `TELEGRAM_BOT_URL_BASE + USUARIO_ID`.
+- n8n captura `chat_id`/`username` y llama a `/api/telegram/vincular`.
+- Al crear un prestamo, Fabularia envia webhook a n8n con datos de libro,
+  usuario propietario, usuario receptor y fecha limite.
 
-El endpoint de catalogo global devuelve sugerencias con:
+## Notas de seguridad y buenas practicas
 
-- `titulo`
-- `autor`
-- `genero`
-- `descripcion`
-- `portada_url`
-
-Cuando se ejecuta `POST /api/prestamos`, la aplicacion envia un webhook a n8n con:
-
-- libro: `id`, `titulo`, `portada_url`
-- usuario_dueno: `id`, `nombre`, `email`, `telefono`, `telegram_chat_id`, `telegram_usuario`
-- usuario_receptor: `id`, `nombre`, `email`, `telefono`, `telegram_chat_id`, `telegram_usuario`
-
-La interfaz `/app` incluye pestaña de **Ajustes** para:
-
-- cambiar contrasena,
-- desvincular Telegram,
-- cerrar sesion,
-- eliminar cuenta (requiere confirmacion y contrasena).
-
-Al eliminar una cuenta se limpian primero los prestamos vinculados a ese usuario
-para respetar las claves foraneas actuales.
-
-En `Mis libros`, el propietario puede eliminar un libro solo si no tiene
-prestamo activo. Si esta prestado, la API responde error de conflicto (409).
-
-## Vinculacion Telegram
-
-Cuando un usuario abre `https://t.me/Fabularia_bot?start=`, tu workflow de n8n debe:
-
-1. Leer `chat_id` y `username` del update de Telegram.
-2. Extraer `USUARIO_ID` del parametro `start`.
-3. Llamar a `POST /api/telegram/vincular` con JSON:
-
-```json
-{
-  "usuario_id": 4,
-  "telegram_chat_id": "123456789",
-  "telegram_usuario": "mi_usuario_telegram",
-  "token_vinculacion": "mismo_valor_que_TELEGRAM_VINCULACION_TOKEN"
-}
-```
-
-Tambien puedes enviar el token en cabecera HTTP `X-Vinculacion-Token`.
+- No incluir tokens, webhooks ni claves SMTP en `README.md` ni en commits.
+- Mantener `.env` fuera de Git.
+- Rotar credenciales si alguna vez se expusieron.
 
 ## Estructura principal
 
-- `config/bootstrap.php`: carga de entorno, logger y conexion BD.
-- `database/schema.sql`: tablas `usuarios`, `libros`, `prestamos`.
-- `database/migracion_apellidos_genero.sql`: alteraciones para anadir `apellidos` y `genero` a esquemas existentes.
-- `database/migracion_telefono_usuarios.sql`: alteracion para anadir `telefono` en usuarios.
-- `database/migracion_telegram_usuarios.sql`: alteracion para anadir `telegram_chat_id` y `telegram_usuario`.
-- `database/migracion_portada_libros.sql`: alteracion para anadir `portada_url` en libros.
-- `database/migracion_lectura_publica_prestamos.sql`: columnas para lectura publica y progreso por prestamo.
-- `src/`: controladores, repositorios, enrutador y utilidades HTTP.
-- `public/index.php`: front controller de la API y de la vista principal.
-- `public/vistas/login.php`: pantalla de acceso.
-- `public/vistas/registro.php`: alta de usuario.
-- `public/vistas/aplicacion.php`: panel principal de la app.
-- `public/assets/`: estilos y JS compartidos de interfaz.
+- `config/`: bootstrap y configuracion inicial.
+- `database/`: esquema y migraciones SQL.
+- `public/`: front controller, vistas y assets.
+- `src/Controladores/`: endpoints y reglas de negocio.
+- `src/Repositorios/`: acceso a base de datos.
+- `src/Servicios/`: catalogo externo, lectura, correo y webhooks.
+- `src/Http/`: router y utilidades HTTP.
+- `logs/`: registro de eventos (`app.log`).
+- `storage/`: archivos subidos y cache de lectura.
+
+## Estado actual
+
+La app esta preparada para entrega funcional de la practica:
+
+- flujo completo de usuarios,
+- intercambio entre usuarios,
+- lectura y progreso,
+- recuperacion de contrasena,
+- integraciones automatizables con n8n/Telegram,
+- y UI responsive con mejoras de usabilidad.

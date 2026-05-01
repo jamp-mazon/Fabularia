@@ -108,7 +108,17 @@ $servicioWebhookPrestamos = new ServicioWebhookPrestamos(
 $servicioCorreo = new ServicioCorreo(
     $logger,
     (string) ($_ENV['MAIL_FROM_EMAIL'] ?? ''),
-    (string) ($_ENV['MAIL_FROM_NAME'] ?? 'Fabularia')
+    (string) ($_ENV['MAIL_FROM_NAME'] ?? 'Fabularia'),
+    [
+        'driver' => (string) ($_ENV['MAIL_DRIVER'] ?? 'mail'),
+        'smtp_host' => (string) ($_ENV['SMTP_HOST'] ?? ''),
+        'smtp_port' => (int) ($_ENV['SMTP_PORT'] ?? 587),
+        'smtp_user' => (string) ($_ENV['SMTP_USER'] ?? ''),
+        'smtp_pass' => (string) ($_ENV['SMTP_PASS'] ?? ''),
+        'smtp_encryption' => (string) ($_ENV['SMTP_ENCRYPTION'] ?? 'tls'),
+        'smtp_auth' => (string) ($_ENV['SMTP_AUTH'] ?? 'true'),
+        'smtp_timeout' => (int) ($_ENV['SMTP_TIMEOUT'] ?? 20),
+    ]
 );
 $servicioLecturaPublica = new ServicioLecturaPublica(
     $logger,

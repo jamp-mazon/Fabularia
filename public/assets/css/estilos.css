@@ -87,6 +87,21 @@ a:hover {
     gap: 0.72rem;
 }
 
+.marca-enlace {
+    color: inherit;
+    text-decoration: none;
+}
+
+.marca-enlace:hover {
+    text-decoration: none;
+}
+
+.marca-enlace:focus-visible {
+    outline: 2px solid rgba(10, 76, 140, 0.35);
+    outline-offset: 4px;
+    border-radius: 12px;
+}
+
 .marca-logo {
     display: block;
     width: 56px;
@@ -1337,6 +1352,20 @@ button:hover {
     text-align: center;
 }
 
+.campo-fecha-solicitud {
+    margin-top: 0.8rem;
+}
+
+.campo-fecha-solicitud label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+}
+
+.campo-fecha-solicitud input {
+    max-width: 280px;
+}
+
 @media (max-width: 1180px) {
     .catalogo-card-acciones button {
         min-width: 120px;
@@ -1525,8 +1554,21 @@ button:hover {
     }
 
     .tab-btn {
-        min-width: 118px;
+        min-width: 0;
+        width: 100%;
         padding: 0.55rem 0.7rem;
+    }
+
+    .tab-nav {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem;
+    }
+
+    .tab-btn--icono {
+        justify-content: center;
+        padding-left: 0.55rem;
+        padding-right: 0.55rem;
     }
 
     .catalogo-card {

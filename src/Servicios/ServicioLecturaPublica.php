@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace Fabularia\Servicios;
 
 use Monolog\Logger;
+use PhpZip\ZipFile;
 use RuntimeException;
+use Smalot\PdfParser\Parser as PdfParser;
+use ZipArchive;
 
 final class ServicioLecturaPublica
 {
     private const MAX_BYTES_DESCARGA = 3_500_000;
+    private const MAX_BYTES_LECTURA_LOCAL = 25_000_000;
     private const MAX_CHARS_PAGINA = 2100;
 
     public function __construct(
@@ -71,6 +75,12 @@ final class ServicioLecturaPublica
 
         if ($fuente === 'epub_demo') {
             $paginas = $this->generarPaginasDemoDesdePrestamo($prestamo);
+        } elseif ($fuente === 'archivo_usuario') {
+            if ($url === '') {
+                throw new RuntimeException('El libro de este prestamo no tiene archivo de lectura disponible.');
+            }
+            $formato = trim((string) ($prestamo['lectura_formato'] ?? ''));
+            $paginas = $this->obtenerPaginasDesdeArchivoSubido($url, $formato);
         } else {
             if ($url === '') {
                 throw new RuntimeException('El libro de este prestamo no tiene lectura publica disponible.');
@@ -507,7 +517,9 @@ final class ServicioLecturaPublica
         try {
             $this->asegurarDirectorioCache();
             $ruta = $this->directorioCacheLecturas . DIRECTORY_SEPARATOR . 'catalogo-libre-' . $idExterno . '.json';
-            file_put_contents($ruta, json_encode($libro, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+            $payload = $libro;
+            $payload['_schema_version'] = 2;
+            file_put_contents($ruta, json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
         } catch (\Throwable) {
             // Cache opcional: no debe romper el flujo principal.
         }
@@ -527,10 +539,79 @@ final class ServicioLecturaPublica
 
             $contenido = (string) file_get_contents($ruta);
             $datos = json_decode($contenido, true);
-            return is_array($datos) ? $datos : null;
+            if (!is_array($datos)) {
+                return null;
+            }
+
+            return $this->normalizarReferenciaCacheCatalogoLibre($datos);
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    /**
+     * @param array<string, mixed> $datos
+     * @return array<string, mixed>
+     */
+    private function normalizarReferenciaCacheCatalogoLibre(array $datos): array
+    {
+        $idioma = trim((string) ($datos['idioma'] ?? 'es'));
+        $idioma = $idioma === 'en' ? 'en' : 'es';
+
+        $generosOriginales = [];
+        $generosBrutos = $datos['generos_originales'] ?? [];
+        if (is_array($generosBrutos)) {
+            foreach ($generosBrutos as $genero) {
+                $texto = trim((string) $genero);
+                if ($texto !== '') {
+                    $generosOriginales[] = $texto;
+                }
+            }
+        }
+
+        $generoPrincipal = trim((string) ($datos['genero'] ?? ''));
+        if ($generoPrincipal === '' && count($generosOriginales) > 0) {
+            $generoPrincipal = (string) $generosOriginales[0];
+        }
+        $datos['genero'] = $this->traducirGeneroCatalogoLibre($generoPrincipal);
+
+        $generosTraducidos = [];
+        $generosCache = $datos['generos'] ?? [];
+        if (is_array($generosCache)) {
+            foreach ($generosCache as $genero) {
+                $traducido = $this->traducirGeneroCatalogoLibre((string) $genero);
+                if ($traducido !== '') {
+                    $generosTraducidos[] = $traducido;
+                }
+            }
+        }
+        foreach ($generosOriginales as $generoOriginal) {
+            $traducido = $this->traducirGeneroCatalogoLibre($generoOriginal);
+            if ($traducido !== '') {
+                $generosTraducidos[] = $traducido;
+            }
+        }
+        $datos['generos'] = array_values(array_unique($generosTraducidos));
+
+        $idioma = $this->resolverIdiomaContenidoCatalogoLibre(
+            $idioma,
+            trim((string) ($datos['titulo'] ?? '')),
+            trim((string) ($datos['descripcion'] ?? '')),
+            $generosOriginales
+        );
+
+        $datos['idioma'] = $idioma;
+        $datos['idioma_etiqueta'] = strtoupper($idioma);
+        $datos['generos_originales'] = $generosOriginales;
+        $datos['descripcion'] = $this->normalizarDescripcionCatalogoLibre(
+            trim((string) ($datos['descripcion'] ?? '')),
+            $idioma,
+            trim((string) ($datos['titulo'] ?? '')),
+            trim((string) ($datos['autor'] ?? '')),
+            $datos['generos']
+        );
+
+        return $datos;
     }
 
     /**
@@ -972,6 +1053,418 @@ final class ServicioLecturaPublica
         }
 
         return $paginasLimpias;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function obtenerPaginasDesdeArchivoSubido(string $rutaRelativa, string $formato): array
+    {
+        $this->asegurarDirectorioCache();
+        $rutaAbsoluta = $this->resolverRutaAbsolutaArchivoUsuario($rutaRelativa);
+        if (!is_file($rutaAbsoluta)) {
+            throw new RuntimeException('No se encontro el archivo del libro para lectura.');
+        }
+
+        $tamano = (int) (@filesize($rutaAbsoluta) ?: 0);
+        if ($tamano <= 0) {
+            throw new RuntimeException('El archivo del libro esta vacio o no es legible.');
+        }
+
+        if ($tamano > self::MAX_BYTES_LECTURA_LOCAL) {
+            throw new RuntimeException('El archivo supera el tamano maximo de lectura permitido.');
+        }
+
+        $mime = $this->resolverMimeLecturaArchivo($rutaRelativa, $formato, basename($rutaAbsoluta));
+        $modificacion = (int) (@filemtime($rutaAbsoluta) ?: time());
+        $cacheKey = sha1('archivo_usuario|' . $rutaRelativa . '|' . $mime . '|' . $modificacion);
+        $rutaPaginas = $this->directorioCacheLecturas . DIRECTORY_SEPARATOR . $cacheKey . '.pages.json';
+
+        if (!is_file($rutaPaginas)) {
+            $texto = str_contains($mime, 'pdf')
+                ? $this->extraerTextoDesdePdfLocal($rutaAbsoluta)
+                : $this->extraerTextoDesdeEpubLocal($rutaAbsoluta);
+            $texto = $this->normalizarContenidoTexto($texto, 'text/plain', false);
+            $paginas = $this->dividirTextoEnPaginas($texto);
+            file_put_contents($rutaPaginas, json_encode($paginas, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        }
+
+        $jsonPaginas = (string) file_get_contents($rutaPaginas);
+        $paginas = json_decode($jsonPaginas, true);
+        if (!is_array($paginas)) {
+            throw new RuntimeException('No se pudo interpretar el contenido del archivo para lectura.');
+        }
+
+        $paginasLimpias = [];
+        foreach ($paginas as $pagina) {
+            $textoPagina = trim((string) $pagina);
+            if ($textoPagina !== '') {
+                $paginasLimpias[] = $textoPagina;
+            }
+        }
+
+        if (count($paginasLimpias) === 0) {
+            throw new RuntimeException('No se encontro texto legible en el archivo subido.');
+        }
+
+        return $paginasLimpias;
+    }
+
+    private function resolverRutaAbsolutaArchivoUsuario(string $rutaRelativa): string
+    {
+        $rutaLimpia = trim(str_replace('\\', '/', $rutaRelativa));
+        if ($rutaLimpia === '' || !str_starts_with($rutaLimpia, 'storage/libros/')) {
+            throw new RuntimeException('La ruta del archivo no es valida.');
+        }
+
+        $rutaProyecto = dirname(__DIR__, 2);
+        $rutaAbsoluta = $rutaProyecto . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $rutaLimpia);
+        $real = realpath($rutaAbsoluta);
+        if ($real === false) {
+            throw new RuntimeException('No se encontro el archivo de lectura.');
+        }
+
+        $baseLibros = realpath($rutaProyecto . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'libros');
+        if ($baseLibros === false || !str_starts_with($real, $baseLibros . DIRECTORY_SEPARATOR)) {
+            throw new RuntimeException('La ruta del archivo de lectura no es segura.');
+        }
+
+        return $real;
+    }
+
+    private function esFormatoLecturaArchivoSoportado(string $rutaArchivo, string $mime): bool
+    {
+        $mimeNormalizado = mb_strtolower(trim($mime), 'UTF-8');
+        $extension = mb_strtolower((string) pathinfo($rutaArchivo, PATHINFO_EXTENSION), 'UTF-8');
+
+        if (in_array($extension, ['epub', 'pdf'], true)) {
+            return true;
+        }
+
+        if ($mimeNormalizado === '') {
+            return false;
+        }
+
+        return str_contains($mimeNormalizado, 'epub')
+            || str_contains($mimeNormalizado, 'pdf')
+            || $mimeNormalizado === 'application/zip';
+    }
+
+    private function resolverMimeLecturaArchivo(string $rutaArchivo, string $mime, string $nombreOriginal): string
+    {
+        $mimeNormalizado = mb_strtolower(trim($mime), 'UTF-8');
+        $extension = mb_strtolower((string) pathinfo($rutaArchivo, PATHINFO_EXTENSION), 'UTF-8');
+        if ($extension === '') {
+            $extension = mb_strtolower((string) pathinfo($nombreOriginal, PATHINFO_EXTENSION), 'UTF-8');
+        }
+
+        if ($extension === 'pdf' || str_contains($mimeNormalizado, 'pdf')) {
+            return 'application/pdf';
+        }
+
+        if ($extension === 'epub' || str_contains($mimeNormalizado, 'epub') || $mimeNormalizado === 'application/zip') {
+            return 'application/epub+zip';
+        }
+
+        return $mimeNormalizado !== '' ? $mimeNormalizado : 'application/octet-stream';
+    }
+
+    private function extraerTextoDesdePdfLocal(string $rutaAbsoluta): string
+    {
+        try {
+            $parser = new PdfParser();
+            $documento = $parser->parseFile($rutaAbsoluta);
+            $texto = trim((string) $documento->getText());
+
+            if ($texto !== '') {
+                return $texto;
+            }
+        } catch (\Throwable $excepcion) {
+            // Fallback a extracción básica por regex de objetos de texto.
+            $textoPlano = $this->extraerTextoDesdePdfBruto($rutaAbsoluta);
+            if ($textoPlano !== '') {
+                return $textoPlano;
+            }
+
+            throw new RuntimeException('No se pudo extraer texto del PDF: ' . $excepcion->getMessage());
+        }
+
+        $textoPlano = $this->extraerTextoDesdePdfBruto($rutaAbsoluta);
+        if ($textoPlano !== '') {
+            return $textoPlano;
+        }
+
+        throw new RuntimeException('El PDF no contiene texto seleccionable.');
+    }
+
+    private function extraerTextoDesdeEpubLocal(string $rutaAbsoluta): string
+    {
+        if (class_exists(ZipArchive::class)) {
+            return $this->extraerTextoDesdeEpubConZipArchive($rutaAbsoluta);
+        }
+
+        return $this->extraerTextoDesdeEpubConZipPuro($rutaAbsoluta);
+    }
+
+    private function extraerTextoDesdeEpubConZipArchive(string $rutaAbsoluta): string
+    {
+        $zip = new ZipArchive();
+        if ($zip->open($rutaAbsoluta) !== true) {
+            throw new RuntimeException('No se pudo abrir el archivo EPUB.');
+        }
+
+        try {
+            $containerXml = (string) $zip->getFromName('META-INF/container.xml');
+            if ($containerXml === '') {
+                throw new RuntimeException('EPUB invalido: falta META-INF/container.xml.');
+            }
+
+            $container = @simplexml_load_string($containerXml);
+            if ($container === false) {
+                throw new RuntimeException('EPUB invalido: container.xml no se puede interpretar.');
+            }
+
+            $namespaces = $container->getNamespaces(true);
+            $rootfiles = $container->rootfiles ?? null;
+            if ($rootfiles === null && isset($namespaces[''])) {
+                $children = $container->children($namespaces['']);
+                $rootfiles = $children->rootfiles ?? null;
+            }
+            if ($rootfiles === null || !isset($rootfiles->rootfile[0])) {
+                throw new RuntimeException('EPUB invalido: no se encontro rootfile.');
+            }
+
+            $atributosRootfile = $rootfiles->rootfile[0]->attributes();
+            $rutaOpf = trim((string) ($atributosRootfile['full-path'] ?? ''));
+            if ($rutaOpf === '') {
+                throw new RuntimeException('EPUB invalido: ruta OPF vacia.');
+            }
+
+            $opfContenido = (string) $zip->getFromName($rutaOpf);
+            if ($opfContenido === '') {
+                throw new RuntimeException('EPUB invalido: no se pudo leer OPF.');
+            }
+
+            $opf = @simplexml_load_string($opfContenido);
+            if ($opf === false) {
+                throw new RuntimeException('EPUB invalido: OPF corrupto.');
+            }
+
+            $ns = $opf->getNamespaces(true);
+            $nsOcf = $ns[''] ?? '';
+            $manifestXml = $nsOcf !== '' ? $opf->children($nsOcf)->manifest : $opf->manifest;
+            $spineXml = $nsOcf !== '' ? $opf->children($nsOcf)->spine : $opf->spine;
+
+            $manifest = [];
+            if ($manifestXml !== null) {
+                foreach ($manifestXml->item as $item) {
+                    $attrs = $item->attributes();
+                    $id = trim((string) ($attrs['id'] ?? ''));
+                    $href = trim((string) ($attrs['href'] ?? ''));
+                    if ($id !== '' && $href !== '') {
+                        $manifest[$id] = $href;
+                    }
+                }
+            }
+
+            $baseDir = str_replace('\\', '/', dirname($rutaOpf));
+            $baseDir = $baseDir === '.' ? '' : $baseDir;
+            $texto = '';
+            if ($spineXml !== null) {
+                foreach ($spineXml->itemref as $itemRef) {
+                    $attrs = $itemRef->attributes();
+                    $idRef = trim((string) ($attrs['idref'] ?? ''));
+                    if ($idRef === '' || !isset($manifest[$idRef])) {
+                        continue;
+                    }
+
+                    $rutaRelCapitulo = $manifest[$idRef];
+                    $rutaInterna = $baseDir !== '' ? ($baseDir . '/' . $rutaRelCapitulo) : $rutaRelCapitulo;
+                    $rutaInterna = preg_replace('#/+#', '/', str_replace('\\', '/', $rutaInterna)) ?: $rutaInterna;
+                    $html = (string) $zip->getFromName($rutaInterna);
+                    if ($html === '') {
+                        continue;
+                    }
+
+                    $textoCapitulo = $this->extraerTextoDesdeHtml($html);
+                    if ($textoCapitulo === '') {
+                        continue;
+                    }
+
+                    $texto .= ($texto === '' ? '' : "\n\n") . $textoCapitulo;
+                }
+            }
+
+            if (trim($texto) === '') {
+                throw new RuntimeException('No se encontro contenido textual en el EPUB.');
+            }
+
+            return $texto;
+        } finally {
+            $zip->close();
+        }
+    }
+
+    private function extraerTextoDesdeEpubConZipPuro(string $rutaAbsoluta): string
+    {
+        $zip = new ZipFile();
+
+        try {
+            $zip->openFile($rutaAbsoluta);
+            $containerXml = trim((string) $zip->getEntryContents('META-INF/container.xml'));
+            if ($containerXml === '') {
+                throw new RuntimeException('EPUB invalido: falta META-INF/container.xml.');
+            }
+
+            $container = @simplexml_load_string($containerXml);
+            if ($container === false) {
+                throw new RuntimeException('EPUB invalido: container.xml no se puede interpretar.');
+            }
+
+            $rootfiles = $container->rootfiles ?? null;
+            if ($rootfiles === null || !isset($rootfiles->rootfile[0])) {
+                throw new RuntimeException('EPUB invalido: no se encontro rootfile.');
+            }
+
+            $atributosRootfile = $rootfiles->rootfile[0]->attributes();
+            $rutaOpf = trim((string) ($atributosRootfile['full-path'] ?? ''));
+            if ($rutaOpf === '') {
+                throw new RuntimeException('EPUB invalido: ruta OPF vacia.');
+            }
+
+            $opfContenido = trim((string) $zip->getEntryContents($rutaOpf));
+            if ($opfContenido === '') {
+                throw new RuntimeException('EPUB invalido: no se pudo leer OPF.');
+            }
+
+            $opf = @simplexml_load_string($opfContenido);
+            if ($opf === false) {
+                throw new RuntimeException('EPUB invalido: OPF corrupto.');
+            }
+
+            $ns = $opf->getNamespaces(true);
+            $nsOcf = $ns[''] ?? '';
+            $manifestXml = $nsOcf !== '' ? $opf->children($nsOcf)->manifest : $opf->manifest;
+            $spineXml = $nsOcf !== '' ? $opf->children($nsOcf)->spine : $opf->spine;
+
+            $manifest = [];
+            if ($manifestXml !== null) {
+                foreach ($manifestXml->item as $item) {
+                    $attrs = $item->attributes();
+                    $id = trim((string) ($attrs['id'] ?? ''));
+                    $href = trim((string) ($attrs['href'] ?? ''));
+                    if ($id !== '' && $href !== '') {
+                        $manifest[$id] = $href;
+                    }
+                }
+            }
+
+            $baseDir = str_replace('\\', '/', dirname($rutaOpf));
+            $baseDir = $baseDir === '.' ? '' : $baseDir;
+            $texto = '';
+
+            if ($spineXml !== null) {
+                foreach ($spineXml->itemref as $itemRef) {
+                    $attrs = $itemRef->attributes();
+                    $idRef = trim((string) ($attrs['idref'] ?? ''));
+                    if ($idRef === '' || !isset($manifest[$idRef])) {
+                        continue;
+                    }
+
+                    $rutaRelCapitulo = $manifest[$idRef];
+                    $rutaInterna = $baseDir !== '' ? ($baseDir . '/' . $rutaRelCapitulo) : $rutaRelCapitulo;
+                    $rutaInterna = preg_replace('#/+#', '/', str_replace('\\', '/', $rutaInterna)) ?: $rutaInterna;
+                    $html = trim((string) $zip->getEntryContents($rutaInterna));
+                    if ($html === '') {
+                        continue;
+                    }
+
+                    $textoCapitulo = $this->extraerTextoDesdeHtml($html);
+                    if ($textoCapitulo === '') {
+                        continue;
+                    }
+
+                    $texto .= ($texto === '' ? '' : "\n\n") . $textoCapitulo;
+                }
+            }
+
+            if (trim($texto) === '') {
+                throw new RuntimeException('No se encontro contenido textual en el EPUB.');
+            }
+
+            return $texto;
+        } catch (\Throwable $excepcion) {
+            throw new RuntimeException('No se pudo abrir EPUB sin ZipArchive: ' . $excepcion->getMessage());
+        } finally {
+            $zip->close();
+        }
+    }
+
+    private function extraerTextoDesdePdfBruto(string $rutaAbsoluta): string
+    {
+        $binario = (string) @file_get_contents($rutaAbsoluta);
+        if ($binario === '') {
+            return '';
+        }
+
+        $coincidencias = [];
+        preg_match_all('/\((.*?)\)\s*T[Jj]/s', $binario, $coincidencias);
+        $fragmentos = $coincidencias[1] ?? [];
+        if (!is_array($fragmentos) || count($fragmentos) === 0) {
+            return '';
+        }
+
+        $texto = [];
+        foreach ($fragmentos as $fragmento) {
+            $valor = trim($this->decodificarCadenaPdf((string) $fragmento));
+            if ($valor !== '') {
+                $texto[] = $valor;
+            }
+        }
+
+        $resultado = trim(implode("\n", $texto));
+        if ($resultado === '' || mb_strlen($resultado, 'UTF-8') < 90) {
+            return '';
+        }
+
+        return $resultado;
+    }
+
+    private function decodificarCadenaPdf(string $cadena): string
+    {
+        $cadena = str_replace(['\\(', '\\)', '\\\\'], ['(', ')', '\\'], $cadena);
+        $cadena = preg_replace_callback(
+            '/\\\\([0-7]{1,3})/',
+            static function (array $matches): string {
+                $codigo = octdec($matches[1]);
+                return chr($codigo);
+            },
+            $cadena
+        ) ?? $cadena;
+
+        $cadena = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', ' ', $cadena) ?? $cadena;
+        if (!mb_check_encoding($cadena, 'UTF-8')) {
+            $cadena = mb_convert_encoding($cadena, 'UTF-8', 'auto');
+        }
+
+        return $cadena;
+    }
+
+    private function extraerTextoDesdeHtml(string $html): string
+    {
+        $html = trim($html);
+        if ($html === '') {
+            return '';
+        }
+
+        $html = preg_replace('/<(br|\/p|\/div|\/li|\/h[1-6])[^>]*>/i', "\n", $html) ?: $html;
+        $texto = strip_tags($html);
+        $texto = html_entity_decode($texto, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $texto = str_replace(["\r\n", "\r"], "\n", $texto);
+        $texto = preg_replace('/[ \t]+/u', ' ', $texto) ?: $texto;
+        $texto = preg_replace("/\n{3,}/u", "\n\n", $texto) ?: $texto;
+
+        return trim($texto);
     }
 
     private function asegurarDirectorioCache(): void
@@ -1447,7 +1940,36 @@ final class ServicioLecturaPublica
     }
 
     /**
-     * Crea una referencia de lectura local tipo EPUB simulado para libros de usuarios.
+     * Construye la referencia de lectura para un libro de usuarios.
+     * Prioridad:
+     * 1) Archivo subido (EPUB/PDF) del propietario.
+     * 2) Demo local por compatibilidad para libros antiguos sin archivo.
+     *
+     * @param array<string, mixed> $libro
+     * @return array<string, mixed>
+     */
+    public function construirReferenciaLecturaParaLibro(array $libro): array
+    {
+        $idLibro = (int) ($libro['id'] ?? $libro['id_libro'] ?? 0);
+        $archivoRuta = trim((string) ($libro['archivo_ruta'] ?? ''));
+        $archivoMime = trim((string) ($libro['archivo_mime'] ?? ''));
+        $archivoNombre = trim((string) ($libro['archivo_nombre_original'] ?? ''));
+
+        if ($archivoRuta !== '' && $this->esFormatoLecturaArchivoSoportado($archivoRuta, $archivoMime)) {
+            return [
+                'lectura_publica' => 1,
+                'lectura_fuente' => 'archivo_usuario',
+                'lectura_id_externo' => 'archivo-libro-' . max(1, $idLibro),
+                'lectura_url' => $archivoRuta,
+                'lectura_formato' => $this->resolverMimeLecturaArchivo($archivoRuta, $archivoMime, $archivoNombre),
+            ];
+        }
+
+        return $this->construirReferenciaEpubPredeterminada($libro);
+    }
+
+    /**
+     * Crea una referencia de lectura local demo para libros sin archivo.
      *
      * @param array<string, mixed> $libro
      * @return array<string, mixed>
@@ -1468,29 +1990,12 @@ final class ServicioLecturaPublica
     private function normalizarTexto(string $texto): string
     {
         $texto = mb_strtolower(trim($texto), 'UTF-8');
-        $texto = strtr($texto, [
-            'Ã¡' => 'a',
-            'Ã©' => 'e',
-            'Ã­' => 'i',
-            'Ã³' => 'o',
-            'Ãº' => 'u',
-            'Ã¼' => 'u',
-            'Ã±' => 'n',
-            'ÃƒÂ¡' => 'a',
-            'ÃƒÂ©' => 'e',
-            'ÃƒÂ­' => 'i',
-            'ÃƒÂ³' => 'o',
-            'ÃƒÂº' => 'u',
-            'ÃƒÂ¼' => 'u',
-            'ÃƒÂ±' => 'n',
-            'ÃƒÆ’Ã‚Â¡' => 'a',
-            'ÃƒÆ’Ã‚Â©' => 'e',
-            'ÃƒÆ’Ã‚Â­' => 'i',
-            'ÃƒÆ’Ã‚Â³' => 'o',
-            'ÃƒÆ’Ã‚Âº' => 'u',
-            'ÃƒÆ’Ã‚Â¼' => 'u',
-            'ÃƒÆ’Ã‚Â±' => 'n',
-        ]);
+
+        $textoAscii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $texto);
+        if (is_string($textoAscii) && $textoAscii !== '') {
+            $texto = mb_strtolower($textoAscii, 'UTF-8');
+        }
+
         $texto = preg_replace('/[^a-z0-9\s]/u', ' ', $texto) ?: $texto;
         $texto = preg_replace('/\s+/u', ' ', $texto) ?: $texto;
         return trim($texto);
@@ -1535,55 +2040,66 @@ final class ServicioLecturaPublica
         }
 
         if ($titulo === '' && $autor === '') {
-            return 'Libro de dominio pÃºblico disponible para lectura en la plataforma.' . $fragmentoGenero;
+            return 'Libro de dominio publico disponible para lectura en la plataforma.' . $fragmentoGenero;
         }
 
         if ($autor === '') {
-            return 'Libro de dominio pÃºblico: ' . $titulo . '.' . $fragmentoGenero;
+            return 'Libro de dominio publico: ' . $titulo . '.' . $fragmentoGenero;
         }
 
-        return 'Libro de dominio pÃºblico de ' . $autor . ': ' . $titulo . '.' . $fragmentoGenero;
+        return 'Libro de dominio publico de ' . $autor . ': ' . $titulo . '.' . $fragmentoGenero;
     }
 
     private function traducirGeneroCatalogoLibre(string $genero): string
     {
         $genero = trim($genero);
         if ($genero === '') {
-            return 'Dominio pÃºblico';
+            return 'Dominio publico';
         }
 
         $reemplazos = [
-            'knights and knighthood' => 'CaballerÃ­a',
-            'juvenile fiction' => 'FicciÃ³n juvenil',
-            'science fiction' => 'Ciencia ficciÃ³n',
-            'spanish language' => 'Lengua espaÃ±ola',
+            'knights and knighthood' => 'Caballeria',
+            'juvenile fiction' => 'Ficcion juvenil',
+            'juvenile nonfiction' => 'No ficcion juvenil',
+            'science fiction' => 'Ciencia ficcion',
+            'spanish language' => 'Lengua espanola',
+            'english language' => 'Lengua inglesa',
+            'french language' => 'Lengua francesa',
+            'german language' => 'Lengua alemana',
+            'italian language' => 'Lengua italiana',
+            'portuguese language' => 'Lengua portuguesa',
             'history' => 'Historia',
-            'fiction' => 'FicciÃ³n',
-            'classics' => 'ClÃ¡sicos',
-            'classic' => 'ClÃ¡sico',
+            'fiction' => 'Ficcion',
+            'classics' => 'Clasicos',
+            'classic' => 'Clasico',
             'crime' => 'Crimen',
-            'fables' => 'FÃ¡bulas',
+            'fables' => 'Fabulas',
             'greek' => 'griego',
-            'translations into spanish' => 'Traducciones al espaÃ±ol',
-            'translation' => 'TraducciÃ³n',
+            'translations into spanish' => 'Traducciones al espanol',
+            'translation' => 'Traduccion',
             'translations' => 'Traducciones',
             'adventure' => 'Aventura',
             'mystery' => 'Misterio',
             'detective' => 'Detective',
             'romance' => 'Romance',
-            'gothic' => 'GÃ³tico',
-            'poetry' => 'PoesÃ­a',
+            'gothic' => 'Gotico',
+            'poetry' => 'Poesia',
             'language' => 'Lengua',
-            'philosophy' => 'FilosofÃ­a',
-            'religion' => 'ReligiÃ³n',
-            'mythology' => 'MitologÃ­a',
-            'epic' => 'Ã‰pico',
+            'philosophy' => 'Filosofia',
+            'religion' => 'Religion',
+            'mythology' => 'Mitologia',
+            'epic' => 'Epico',
             'drama' => 'Drama',
             'humor' => 'Humor',
-            'biography' => 'BiografÃ­a',
-            'autobiography' => 'AutobiografÃ­a',
-            'education' => 'EducaciÃ³n',
-            'politics' => 'PolÃ­tica',
+            'biography' => 'Biografia',
+            'autobiography' => 'Autobiografia',
+            'education' => 'Educacion',
+            'politics' => 'Politica',
+            'war' => 'Guerra',
+            'military' => 'Militar',
+            'travel' => 'Viajes',
+            'geography' => 'Geografia',
+            'children' => 'Infantil',
             'essays' => 'Ensayos',
             'essay' => 'Ensayo',
         ];
@@ -1637,6 +2153,12 @@ final class ServicioLecturaPublica
             if ($candidatoNormalizado !== '' && str_contains($candidatoNormalizado, $filtroGeneroNormalizado)) {
                 return true;
             }
+
+            $traducido = $this->traducirGeneroCatalogoLibre((string) $candidato);
+            $traducidoNormalizado = $this->normalizarTexto($traducido);
+            if ($traducidoNormalizado !== '' && str_contains($traducidoNormalizado, $filtroGeneroNormalizado)) {
+                return true;
+            }
         }
 
         return false;
@@ -1666,10 +2188,6 @@ final class ServicioLecturaPublica
         $palabras = preg_split('/[^a-záéíóúüñ]+/u', $muestra) ?: [];
         $palabras = array_values(array_filter($palabras, static fn (string $p): bool => $p !== ''));
 
-        if (count($palabras) < 6) {
-            return true;
-        }
-
         $comunesEs = [
             'de', 'la', 'que', 'el', 'en', 'y', 'a', 'los', 'del', 'se', 'las',
             'por', 'un', 'para', 'con', 'no', 'una', 'su', 'al', 'lo', 'como',
@@ -1689,6 +2207,16 @@ final class ServicioLecturaPublica
         $total = max(1, count($palabras));
         $ratioEs = $aciertosEs / $total;
         $ratioEn = $aciertosEn / $total;
+
+        if ($total < 6) {
+            if ($aciertosEn >= 2 && $aciertosEn > $aciertosEs) {
+                return false;
+            }
+            if ($aciertosEs >= 1) {
+                return true;
+            }
+            return !preg_match('/\\b(the|and|with|from|that|this|into|about)\\b/u', $muestra);
+        }
 
         if ($total < 80) {
             if ($ratioEn >= 0.08 && $ratioEn > ($ratioEs + 0.03)) {

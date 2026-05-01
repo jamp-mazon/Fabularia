@@ -89,7 +89,9 @@ final class RepositorioLibros
 
     public function obtenerPorId(int $idLibro): ?array
     {
-        $sql = 'SELECT l.id, l.id_usuario, l.titulo, l.autor, l.genero, l.portada_url, l.descripcion, l.activo_intercambio,
+        $sql = 'SELECT l.id, l.id_usuario, l.titulo, l.autor, l.genero, l.portada_url, l.descripcion,
+                       l.archivo_ruta, l.archivo_mime, l.archivo_nombre_original,
+                       l.activo_intercambio,
                        CONCAT(u.nombre, " ", u.apellidos) AS nombre_propietario
                 FROM libros l
                 INNER JOIN usuarios u ON u.id = l.id_usuario

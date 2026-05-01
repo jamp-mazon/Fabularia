@@ -36,7 +36,7 @@ final class ControladorPrestamos
         $idLibro = SolicitudHttp::obtenerEntero($datos, 'id_libro');
 
         if ($idLibro <= 0) {
-            return [422, ['error' => 'Debes indicar un id_libro valido.']];
+            return [422, ['error' => 'Debes indicar un id_libro válido.']];
         }
 
         $libro = $this->repositorioLibros->obtenerPorId($idLibro);
@@ -50,38 +50,51 @@ final class ControladorPrestamos
         }
 
         if (!$this->repositorioLibros->usuarioTieneLibroDisponibleParaIntercambio($idUsuarioPrestado)) {
-            return [409, ['error' => 'Para solicitar un prestamo debes tener al menos un libro propio disponible para intercambio.']];
+            return [409, ['error' => 'Para solicitar un préstamo debes tener al menos un libro propio disponible para intercambio.']];
         }
 
         if ((int) $libro['activo_intercambio'] !== 1) {
-            return [409, ['error' => 'Este libro ya no esta disponible para intercambio.']];
+            return [409, ['error' => 'Este libro ya no está disponible para intercambio.']];
         }
 
         if ($this->repositorioPrestamos->existePrestamoActivo($idLibro)) {
-            return [409, ['error' => 'El libro ya esta prestado actualmente.']];
+            return [409, ['error' => 'El libro ya está prestado actualmente.']];
         }
 
-        $referenciaLectura = $this->servicioLecturaPublica->construirReferenciaEpubPredeterminada($libro);
+        [$fechaLimiteDevolucion, $errorFecha] = $this->resolverFechaLimiteDevolucion($datos);
+        if ($errorFecha !== null) {
+            return [422, ['error' => $errorFecha]];
+        }
+
+        $referenciaLectura = $this->servicioLecturaPublica->construirReferenciaLecturaParaLibro($libro);
 
         $idPrestamo = $this->repositorioPrestamos->crearPrestamo(
             $idLibro,
             $idUsuarioDueno,
             $idUsuarioPrestado,
-            $referenciaLectura
+            $referenciaLectura,
+            $fechaLimiteDevolucion
         );
 
-        $this->logger->info('Prestamo creado', [
+        $this->logger->info('Préstamo creado', [
             'id_prestamo' => $idPrestamo,
             'id_libro' => $idLibro,
             'id_usuario_dueno' => $idUsuarioDueno,
             'id_usuario_prestado' => $idUsuarioPrestado,
+            'fecha_limite_devolucion' => $fechaLimiteDevolucion,
             'lectura_publica' => (int) ($referenciaLectura['lectura_publica'] ?? 0),
             'lectura_fuente' => $referenciaLectura['lectura_fuente'] ?? null,
         ]);
 
-        $this->enviarNotificacionWebhook($idPrestamo, $libro, $idUsuarioDueno, $idUsuarioPrestado);
+        $this->enviarNotificacionWebhook(
+            $idPrestamo,
+            $libro,
+            $idUsuarioDueno,
+            $idUsuarioPrestado,
+            $fechaLimiteDevolucion
+        );
 
-        return [201, ['mensaje' => 'Prestamo solicitado correctamente.', 'id_prestamo' => $idPrestamo]];
+        return [201, ['mensaje' => 'Préstamo solicitado correctamente.', 'id_prestamo' => $idPrestamo]];
     }
 
     /**
@@ -109,20 +122,20 @@ final class ControladorPrestamos
         $paginaSolicitada = (int) ($_GET['pagina'] ?? 1);
 
         if ($idPrestamo <= 0) {
-            return [422, ['error' => 'Debes indicar un id_prestamo valido.']];
+            return [422, ['error' => 'Debes indicar un id_prestamo válido.']];
         }
 
         $prestamo = $this->repositorioPrestamos->obtenerPrestamoDeUsuario($idPrestamo, $idUsuario);
         if ($prestamo === null) {
-            return [404, ['error' => 'No se encontro el prestamo solicitado.']];
+            return [404, ['error' => 'No se encontró el préstamo solicitado.']];
         }
 
         if ($prestamo['fecha_devolucion'] !== null) {
-            return [409, ['error' => 'El prestamo ya fue devuelto y no admite lectura.']];
+            return [409, ['error' => 'El préstamo ya fue devuelto y no admite lectura.']];
         }
 
         if ((int) ($prestamo['lectura_publica'] ?? 0) !== 1) {
-            $referenciaDemo = $this->servicioLecturaPublica->construirReferenciaEpubPredeterminada($prestamo);
+            $referenciaDemo = $this->servicioLecturaPublica->construirReferenciaLecturaParaLibro($prestamo);
             $this->repositorioPrestamos->actualizarFuenteLectura($idPrestamo, $idUsuario, $referenciaDemo);
             $prestamoActualizado = $this->repositorioPrestamos->obtenerPrestamoDeUsuario($idPrestamo, $idUsuario);
             if ($prestamoActualizado !== null) {
@@ -157,6 +170,15 @@ final class ControladorPrestamos
                 ],
             ];
         } catch (RuntimeException $excepcion) {
+            $this->logger->warning('Fallo de lectura de préstamo', [
+                'id_prestamo' => $idPrestamo,
+                'id_usuario' => $idUsuario,
+                'mensaje' => $excepcion->getMessage(),
+                'lectura_fuente' => (string) ($prestamo['lectura_fuente'] ?? ''),
+                'lectura_formato' => (string) ($prestamo['lectura_formato'] ?? ''),
+                'lectura_url' => (string) ($prestamo['lectura_url'] ?? ''),
+            ]);
+
             $mensaje = $excepcion->getMessage();
             if (str_contains(mb_strtolower($mensaje, 'UTF-8'), 'no esta en espanol')) {
                 $referenciaNueva = $this->servicioLecturaPublica->buscarReferenciaPublica(
@@ -206,7 +228,7 @@ final class ControladorPrestamos
                     }
                 }
 
-                // Si no hay reemplazo en espanol, invalidamos la fuente para no reutilizar
+                // Si no hay reemplazo en español, invalidamos la fuente para no reutilizar
                 // una referencia incorrecta en intentos siguientes.
                 $this->repositorioPrestamos->actualizarFuenteLectura($idPrestamo, $idUsuario, [
                     'lectura_publica' => 0,
@@ -219,7 +241,7 @@ final class ControladorPrestamos
 
             return [409, ['error' => $this->traducirErrorLectura($excepcion->getMessage())]];
         } catch (\Throwable $excepcion) {
-            $this->logger->error('Error al leer prestamo', [
+            $this->logger->error('Error al leer préstamo', [
                 'id_prestamo' => $idPrestamo,
                 'id_usuario' => $idUsuario,
                 'mensaje' => $excepcion->getMessage(),
@@ -241,26 +263,26 @@ final class ControladorPrestamos
         $paginasTotales = SolicitudHttp::obtenerEntero($datos, 'total_paginas');
 
         if ($idPrestamo <= 0 || $paginaActual <= 0) {
-            return [422, ['error' => 'Debes indicar id_prestamo y pagina_actual validos.']];
+            return [422, ['error' => 'Debes indicar id_prestamo y pagina_actual válidos.']];
         }
 
         $prestamo = $this->repositorioPrestamos->obtenerPrestamoDeUsuario($idPrestamo, $idUsuario);
         if ($prestamo === null) {
-            return [404, ['error' => 'No se encontro el prestamo seleccionado.']];
+            return [404, ['error' => 'No se encontró el préstamo seleccionado.']];
         }
 
         if ($prestamo['fecha_devolucion'] !== null) {
-            return [409, ['error' => 'Este prestamo ya fue devuelto.']];
+            return [409, ['error' => 'Este préstamo ya fue devuelto.']];
         }
 
         if ((int) ($prestamo['lectura_publica'] ?? 0) !== 1) {
-            $referenciaDemo = $this->servicioLecturaPublica->construirReferenciaEpubPredeterminada($prestamo);
+            $referenciaDemo = $this->servicioLecturaPublica->construirReferenciaLecturaParaLibro($prestamo);
             $this->repositorioPrestamos->actualizarFuenteLectura($idPrestamo, $idUsuario, $referenciaDemo);
             $prestamoActualizado = $this->repositorioPrestamos->obtenerPrestamoDeUsuario($idPrestamo, $idUsuario);
             if ($prestamoActualizado !== null) {
                 $prestamo = $prestamoActualizado;
             } else {
-                return [409, ['error' => 'Este libro no dispone de lectura publica.']];
+                return [409, ['error' => 'Este libro no dispone de lectura pública.']];
             }
         }
 
@@ -305,16 +327,16 @@ final class ControladorPrestamos
         $idPrestamo = SolicitudHttp::obtenerEntero($datos, 'id_prestamo');
 
         if ($idPrestamo <= 0) {
-            return [422, ['error' => 'Debes indicar un id_prestamo valido.']];
+            return [422, ['error' => 'Debes indicar un id_prestamo válido.']];
         }
 
         $actualizado = $this->repositorioPrestamos->devolverPrestamo($idPrestamo, $idUsuario);
         if (!$actualizado) {
-            return [404, ['error' => 'No se encontro un prestamo activo para devolver con ese id.']];
+            return [404, ['error' => 'No se encontró un préstamo activo para devolver con ese id.']];
         }
 
-        $this->logger->info('Prestamo devuelto', ['id_prestamo' => $idPrestamo, 'id_usuario' => $idUsuario]);
-        return [200, ['mensaje' => 'Prestamo devuelto correctamente.']];
+        $this->logger->info('Préstamo devuelto', ['id_prestamo' => $idPrestamo, 'id_usuario' => $idUsuario]);
+        return [200, ['mensaje' => 'Préstamo devuelto correctamente.']];
     }
 
     /**
@@ -324,7 +346,8 @@ final class ControladorPrestamos
         int $idPrestamo,
         array $libro,
         int $idUsuarioDueno,
-        int $idUsuarioPrestado
+        int $idUsuarioPrestado,
+        ?string $fechaLimiteDevolucion
     ): void {
         $usuarioDueno = $this->repositorioUsuarios->obtenerPorId($idUsuarioDueno);
         $usuarioPrestado = $this->repositorioUsuarios->obtenerPorId($idUsuarioPrestado);
@@ -341,6 +364,7 @@ final class ControladorPrestamos
             'fecha_evento' => date(DATE_ATOM),
             'prestamo' => [
                 'id' => $idPrestamo,
+                'fecha_limite_devolucion' => $fechaLimiteDevolucion,
             ],
             'libro' => [
                 'id' => (int) ($libro['id'] ?? 0),
@@ -373,11 +397,20 @@ final class ControladorPrestamos
         $mensajeNormalizado = mb_strtolower(trim($mensaje), 'UTF-8');
 
         if (str_contains($mensajeNormalizado, 'no esta en espanol')) {
-            return 'No se encontro una version publica en espanol para este libro.';
+            return 'No se encontró una versión pública en español para este libro.';
         }
 
         if (str_contains($mensajeNormalizado, 'no tiene lectura publica disponible')) {
-            return 'Este libro no tiene lectura publica disponible.';
+            return 'Este libro no tiene lectura pública disponible.';
+        }
+
+        if (
+            str_contains($mensajeNormalizado, 'archivo del libro')
+            || str_contains($mensajeNormalizado, 'epub')
+            || str_contains($mensajeNormalizado, 'pdf')
+            || str_contains($mensajeNormalizado, 'ziparchive')
+        ) {
+            return 'No se pudo abrir el archivo de lectura de este libro. Revisa el formato EPUB/PDF y vuelve a intentarlo.';
         }
 
         if (
@@ -385,9 +418,42 @@ final class ControladorPrestamos
             || str_contains($mensajeNormalizado, 'timeout')
             || str_contains($mensajeNormalizado, 'http')
         ) {
-            return 'No se pudo cargar el texto publico ahora. Intentalo de nuevo en unos segundos.';
+            return 'No se pudo cargar el texto público ahora. Inténtalo de nuevo en unos segundos.';
         }
 
         return $mensaje;
+    }
+
+    /**
+     * @param array<string, mixed> $datos
+     * @return array{0: string|null, 1: string|null}
+     */
+    private function resolverFechaLimiteDevolucion(array $datos): array
+    {
+        $entrada = trim((string) ($datos['fecha_limite_devolucion'] ?? ''));
+
+        $hoy = new \DateTimeImmutable('today');
+        $maximo = $hoy->modify('+14 days');
+
+        if ($entrada === '') {
+            $predeterminada = $maximo->setTime(23, 59, 59);
+            return [$predeterminada->format('Y-m-d H:i:s'), null];
+        }
+
+        $fecha = \DateTimeImmutable::createFromFormat('Y-m-d', $entrada);
+        if (!$fecha) {
+            return [null, 'La fecha límite de devolución no tiene un formato válido.'];
+        }
+
+        $fecha = $fecha->setTime(23, 59, 59);
+        if ($fecha < $hoy->setTime(0, 0, 0)) {
+            return [null, 'La fecha límite no puede ser anterior a hoy.'];
+        }
+
+        if ($fecha > $maximo->setTime(23, 59, 59)) {
+            return [null, 'La fecha límite no puede superar 14 días desde hoy.'];
+        }
+
+        return [$fecha->format('Y-m-d H:i:s'), null];
     }
 }

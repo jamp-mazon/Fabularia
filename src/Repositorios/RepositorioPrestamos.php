@@ -27,13 +27,15 @@ final class RepositorioPrestamos
         int $idLibro,
         int $idUsuarioDueno,
         int $idUsuarioPrestado,
-        array $lectura = []
+        array $lectura = [],
+        ?string $fechaLimiteDevolucion = null
     ): int
     {
         $sql = 'INSERT INTO prestamos (
                     id_libro,
                     id_usuario_dueno,
                     id_usuario_prestado,
+                    fecha_limite_devolucion,
                     lectura_publica,
                     lectura_fuente,
                     lectura_id_externo,
@@ -46,6 +48,7 @@ final class RepositorioPrestamos
                     :id_libro,
                     :id_usuario_dueno,
                     :id_usuario_prestado,
+                    :fecha_limite_devolucion,
                     :lectura_publica,
                     :lectura_fuente,
                     :lectura_id_externo,
@@ -59,6 +62,7 @@ final class RepositorioPrestamos
             'id_libro' => $idLibro,
             'id_usuario_dueno' => $idUsuarioDueno,
             'id_usuario_prestado' => $idUsuarioPrestado,
+            'fecha_limite_devolucion' => $fechaLimiteDevolucion,
             'lectura_publica' => (int) ($lectura['lectura_publica'] ?? 0),
             'lectura_fuente' => $lectura['lectura_fuente'] ?? null,
             'lectura_id_externo' => $lectura['lectura_id_externo'] ?? null,
@@ -71,10 +75,11 @@ final class RepositorioPrestamos
 
     public function listarPrestamosDeUsuario(int $idUsuarioPrestado): array
     {
-        $sql = 'SELECT p.id, p.fecha_prestamo, p.fecha_devolucion,
+        $sql = 'SELECT p.id, p.fecha_prestamo, p.fecha_limite_devolucion, p.fecha_devolucion,
                        p.lectura_publica, p.lectura_fuente, p.lectura_id_externo, p.lectura_url, p.lectura_formato,
                        p.pagina_lectura_actual, p.paginas_lectura_totales, p.fecha_actualizacion_lectura,
                        l.id AS id_libro, l.titulo, l.autor, l.genero, l.descripcion, l.portada_url,
+                       l.archivo_ruta, l.archivo_mime, l.archivo_nombre_original,
                        CONCAT(u.nombre, " ", u.apellidos) AS nombre_dueno
                 FROM prestamos p
                 INNER JOIN libros l ON l.id = p.id_libro
@@ -88,10 +93,11 @@ final class RepositorioPrestamos
 
     public function obtenerPrestamoDeUsuario(int $idPrestamo, int $idUsuarioPrestado): ?array
     {
-        $sql = 'SELECT p.id, p.id_libro, p.fecha_prestamo, p.fecha_devolucion,
+        $sql = 'SELECT p.id, p.id_libro, p.fecha_prestamo, p.fecha_limite_devolucion, p.fecha_devolucion,
                        p.lectura_publica, p.lectura_fuente, p.lectura_id_externo, p.lectura_url, p.lectura_formato,
                        p.pagina_lectura_actual, p.paginas_lectura_totales, p.fecha_actualizacion_lectura,
                        l.titulo, l.autor, l.genero, l.descripcion, l.portada_url,
+                       l.archivo_ruta, l.archivo_mime, l.archivo_nombre_original,
                        CONCAT(u.nombre, " ", u.apellidos) AS nombre_dueno
                 FROM prestamos p
                 INNER JOIN libros l ON l.id = p.id_libro

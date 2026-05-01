@@ -5,14 +5,39 @@ declare(strict_types=1);
 namespace Fabularia\Servicios;
 
 use Monolog\Logger;
+use PHPMailer\PHPMailer\Exception as PHPMailerException;
+use PHPMailer\PHPMailer\PHPMailer;
 
 final class ServicioCorreo
 {
+    private string $driver;
+    private string $smtpHost;
+    private int $smtpPort;
+    private string $smtpUser;
+    private string $smtpPass;
+    private string $smtpEncryption;
+    private bool $smtpAuth;
+    private int $smtpTimeout;
+
     public function __construct(
         private readonly Logger $logger,
         private readonly string $remitenteEmail,
-        private readonly string $remitenteNombre
+        private readonly string $remitenteNombre,
+        array $config = []
     ) {
+        $this->driver = mb_strtolower(trim((string) ($config['driver'] ?? 'mail')), 'UTF-8');
+        $this->smtpHost = trim((string) ($config['smtp_host'] ?? ''));
+        $this->smtpPort = max(1, (int) ($config['smtp_port'] ?? 587));
+        $this->smtpUser = trim((string) ($config['smtp_user'] ?? ''));
+        $this->smtpPass = (string) ($config['smtp_pass'] ?? '');
+        $this->smtpEncryption = mb_strtolower(trim((string) ($config['smtp_encryption'] ?? 'tls')), 'UTF-8');
+        $smtpAuthValor = $config['smtp_auth'] ?? true;
+        $this->smtpAuth = !in_array(
+            mb_strtolower(trim((string) $smtpAuthValor), 'UTF-8'),
+            ['0', 'false', 'no', 'off'],
+            true
+        );
+        $this->smtpTimeout = max(3, min(60, (int) ($config['smtp_timeout'] ?? 20)));
     }
 
     public function enviarCorreoHtml(
@@ -35,8 +60,50 @@ final class ServicioCorreo
         }
 
         $nombre = trim($this->remitenteNombre) !== '' ? trim($this->remitenteNombre) : 'Fabularia';
-        $asuntoCodificado = mb_encode_mimeheader($asunto, 'UTF-8', 'B');
+        $textoPlano = trim($textoPlano);
+        if ($textoPlano === '') {
+            $textoPlano = trim(strip_tags($html));
+        }
 
+        if ($this->debeUsarSmtp()) {
+            return $this->enviarConSmtp(
+                $destinatarioEmail,
+                $asunto,
+                $html,
+                $textoPlano,
+                $remitenteEmail,
+                $nombre
+            );
+        }
+
+        return $this->enviarConMailNativo(
+            $destinatarioEmail,
+            $asunto,
+            $html,
+            $textoPlano,
+            $remitenteEmail,
+            $nombre
+        );
+    }
+
+    private function debeUsarSmtp(): bool
+     {
+        if ($this->driver === 'smtp') {
+            return true;
+        }
+
+        return $this->smtpHost !== '' && $this->driver !== 'mail';
+    }
+
+    private function enviarConMailNativo(
+        string $destinatarioEmail,
+        string $asunto,
+        string $html,
+        string $textoPlano,
+        string $remitenteEmail,
+        string $nombre
+    ): bool {
+        $asuntoCodificado = mb_encode_mimeheader($asunto, 'UTF-8', 'B');
         $limiteMime = 'fabularia_' . bin2hex(random_bytes(8));
         $headers = [
             'MIME-Version: 1.0',
@@ -44,11 +111,6 @@ final class ServicioCorreo
             'Reply-To: ' . $remitenteEmail,
             'Content-Type: multipart/alternative; boundary="' . $limiteMime . '"',
         ];
-
-        $textoPlano = trim($textoPlano);
-        if ($textoPlano === '') {
-            $textoPlano = trim(strip_tags($html));
-        }
 
         $cuerpo = [];
         $cuerpo[] = '--' . $limiteMime;
@@ -75,6 +137,55 @@ final class ServicioCorreo
         }
 
         return $enviado;
+    }
+
+    private function enviarConSmtp(
+        string $destinatarioEmail,
+        string $asunto,
+        string $html,
+        string $textoPlano,
+        string $remitenteEmail,
+        string $nombre
+    ): bool {
+        if ($this->smtpHost === '') {
+            $this->logger->warning('No se pudo enviar correo SMTP: SMTP_HOST vacio.', [
+                'destinatario' => $destinatarioEmail,
+                'asunto' => $asunto,
+            ]);
+            return false;
+        }
+
+        $mail = new PHPMailer(true);
+        try {
+            $mail->CharSet = 'UTF-8';
+            $mail->isSMTP();
+            $mail->Host = $this->smtpHost;
+            $mail->Port = $this->smtpPort;
+            $mail->SMTPAuth = $this->smtpAuth;
+            $mail->Username = $this->smtpUser;
+            $mail->Password = $this->smtpPass;
+            $mail->Timeout = $this->smtpTimeout;
+
+            if (in_array($this->smtpEncryption, ['tls', 'ssl'], true)) {
+                $mail->SMTPSecure = $this->smtpEncryption;
+            }
+
+            $mail->setFrom($remitenteEmail, $nombre);
+            $mail->addAddress($destinatarioEmail);
+            $mail->Subject = $asunto;
+            $mail->isHTML(true);
+            $mail->Body = $html;
+            $mail->AltBody = $textoPlano;
+
+            return $mail->send();
+        } catch (PHPMailerException $excepcion) {
+            $this->logger->warning('Fallo al enviar correo SMTP', [
+                'destinatario' => $destinatarioEmail,
+                'asunto' => $asunto,
+                'mensaje' => $excepcion->getMessage(),
+            ]);
+            return false;
+        }
     }
 }
 
