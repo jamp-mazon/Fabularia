@@ -212,10 +212,13 @@ final class RepositorioUsuarios
              * referencias de prestamos donde participa (dueno o receptor).
              */
             $sqlPrestamos = 'DELETE FROM prestamos
-                             WHERE id_usuario_dueno = :id_usuario
-                                OR id_usuario_prestado = :id_usuario';
+                             WHERE id_usuario_dueno = :id_usuario_dueno
+                                OR id_usuario_prestado = :id_usuario_prestado';
             $sentenciaPrestamos = $this->conexion->prepare($sqlPrestamos);
-            $sentenciaPrestamos->execute(['id_usuario' => $idUsuario]);
+            $sentenciaPrestamos->execute([
+                'id_usuario_dueno' => $idUsuario,
+                'id_usuario_prestado' => $idUsuario,
+            ]);
 
             $sqlUsuario = 'DELETE FROM usuarios
                            WHERE id = :id_usuario';
