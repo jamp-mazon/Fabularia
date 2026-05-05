@@ -207,6 +207,8 @@ $enrutador->registrar('POST', '/api/usuarios/telefono', static fn () => $control
 $enrutador->registrar('POST', '/api/usuarios/cambiar-contrasena', static fn () => $controladorUsuarios->cambiarContrasena(), true);
 $enrutador->registrar('POST', '/api/usuarios/telegram/desvincular', static fn () => $controladorUsuarios->desvincularTelegram(), true);
 $enrutador->registrar('DELETE', '/api/usuarios/cuenta', static fn () => $controladorUsuarios->eliminarCuenta(), true);
+// Endpoint alternativo por compatibilidad con hostings/proxys que limitan body en DELETE.
+$enrutador->registrar('POST', '/api/usuarios/cuenta/eliminar', static fn () => $controladorUsuarios->eliminarCuenta(), true);
 $enrutador->registrar('GET', '/api/catalogo/sugerencias', static fn () => $controladorCatalogoLibros->sugerencias(), true);
 $enrutador->registrar('GET', '/api/catalogo/libre', static fn () => $controladorCatalogoLibros->catalogoLibre(), true);
 $enrutador->registrar('GET', '/api/catalogo/libre/lectura', static fn () => $controladorCatalogoLibros->leerCatalogoLibre(), true);

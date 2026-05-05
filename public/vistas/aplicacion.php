@@ -2343,7 +2343,7 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         }
 
         try {
-            await window.fabularia.llamarApi("/usuarios/cuenta", "DELETE", { contrasena });
+            await window.fabularia.llamarApi("/usuarios/cuenta/eliminar", "POST", { contrasena });
             window.location.href = <?= json_encode($urlLogin, JSON_UNESCAPED_SLASHES) ?>;
         } catch (error) {
             mostrarMensaje(error.message, "error");
