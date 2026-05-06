@@ -2354,7 +2354,6 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         try {
             await actualizarSesion();
             await cargarPanelCompleto();
-            void precargarCatalogoLibre("", "", 1, 1);
             activarVistaCatalogo("usuarios");
             activarTab("catalogo");
         } catch (error) {

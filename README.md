@@ -84,7 +84,28 @@ SMTP_AUTH=true
 SMTP_TIMEOUT=20
 
 PASSWORD_RESET_TTL_MINUTES=30
-LECTURA_CACHE_DIR=
+LECTURA_CACHE_DIR=/www/proyectos/fabularia/storage/lecturas
+```
+
+## Cache del catalogo libre en VPS
+
+El catalogo gratuito consulta Gutendex. Para que el login no dependa de esa API externa, la aplicacion no precarga el catalogo al iniciar sesion.
+
+En VPS puedes precalentar la cache con:
+
+```bash
+php /www/proyectos/fabularia/scripts/precalentar_catalogo_libre.php 3 10
+```
+
+Parametros:
+
+- `3`: paginas por idioma a precalentar.
+- `10`: libros por pagina.
+
+Cron recomendado cada 15 minutos:
+
+```cron
+*/15 * * * * /usr/bin/php /www/proyectos/fabularia/scripts/precalentar_catalogo_libre.php 3 10 >/dev/null 2>&1
 ```
 
 ## Base de datos
