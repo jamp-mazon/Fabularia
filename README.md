@@ -241,6 +241,7 @@ Payload plano recomendado desde n8n:
 ```
 
 Tambien se acepta un update de Telegram con `message.chat.id`, `message.from.username` y texto `/start USUARIO_ID`.
+Si n8n envuelve el contenido en `body`, `json` o `data`, el backend tambien intenta leerlo desde ahi.
 `TELEGRAM_VINCULACION_TOKEN` no debe publicarse ni subirse a Git; debe coincidir exactamente entre `.env` y n8n.
 
 ## Notas de seguridad y buenas practicas
