@@ -62,6 +62,11 @@ final class ControladorTelegram
             return [401, ['error' => 'Token de vinculacion invalido.']];
         }
 
+        $respuestaStart = $this->vincularDesdeComandoStart($datos);
+        if ($respuestaStart !== null) {
+            return $respuestaStart;
+        }
+
         $idUsuario = $this->obtenerEnteroFlexible($datos, [
             'usuario_id',
             'id_usuario',
@@ -80,46 +85,8 @@ final class ControladorTelegram
             $idUsuario = $this->obtenerUsuarioIdDesdeStart($datos);
         }
 
-        $telegramChatId = $this->obtenerTextoFlexible($datos, [
-            'telegram_chat_id',
-            'chat_id',
-            'message.chat.id',
-            'callback_query.message.chat.id',
-            'body.telegram_chat_id',
-            'body.chat_id',
-            'body.message.chat.id',
-            'body.callback_query.message.chat.id',
-            'json.telegram_chat_id',
-            'json.chat_id',
-            'json.message.chat.id',
-            'json.callback_query.message.chat.id',
-            'data.telegram_chat_id',
-            'data.chat_id',
-            'data.message.chat.id',
-            'data.callback_query.message.chat.id',
-        ]);
-        $telegramUsuario = $this->obtenerTextoFlexible($datos, [
-            'telegram_usuario',
-            'username',
-            'message.from.username',
-            'message.chat.username',
-            'callback_query.from.username',
-            'body.telegram_usuario',
-            'body.username',
-            'body.message.from.username',
-            'body.message.chat.username',
-            'body.callback_query.from.username',
-            'json.telegram_usuario',
-            'json.username',
-            'json.message.from.username',
-            'json.message.chat.username',
-            'json.callback_query.from.username',
-            'data.telegram_usuario',
-            'data.username',
-            'data.message.from.username',
-            'data.message.chat.username',
-            'data.callback_query.from.username',
-        ]);
+        $telegramChatId = $this->obtenerChatIdTelegram($datos);
+        $telegramUsuario = $this->obtenerUsuarioTelegram($datos);
         $telegramUsuario = $telegramUsuario === '' ? null : $telegramUsuario;
 
         if ($idUsuario <= 0 || $telegramChatId === '') {
@@ -131,6 +98,70 @@ final class ControladorTelegram
             return [422, ['error' => 'usuario_id y telegram_chat_id son obligatorios.']];
         }
 
+        return $this->guardarVinculacionTelegram($idUsuario, $telegramChatId, $telegramUsuario, 'payload_n8n');
+    }
+
+    /**
+     * @param array<string, mixed> $datos
+     * @return array{0: int, 1: array<string, mixed>}|null
+     */
+    private function vincularDesdeComandoStart(array $datos): ?array
+    {
+        $textoTelegram = $this->obtenerTextoTelegram($datos);
+        if ($textoTelegram === '') {
+            return null;
+        }
+
+        if (preg_match('/^\\/start(?:@\\w+)?(?:\\s|$)/', $textoTelegram) !== 1) {
+            return null;
+        }
+
+        $chatIdTelegram = $this->obtenerChatIdTelegram($datos);
+        $usuarioTelegram = $this->obtenerUsuarioTelegram($datos);
+        $firstNameTelegram = $this->obtenerFirstNameTelegram($datos);
+        $nombreGuardable = $usuarioTelegram !== '' ? $usuarioTelegram : ($firstNameTelegram !== '' ? $firstNameTelegram : null);
+
+        if (preg_match('/^\\/start(?:@\\w+)?$/', $textoTelegram) === 1) {
+            $this->logger->warning('Telegram /start recibido sin id de usuario Fabularia.', [
+                'telegram_chat_id_recibido' => $chatIdTelegram !== '',
+                'telegram_usuario_recibido' => $usuarioTelegram !== '',
+                'first_name_recibido' => $firstNameTelegram !== '',
+            ]);
+
+            return [
+                422,
+                [
+                    'error' => 'Abre Telegram desde el enlace de Fabularia para vincular tu usuario correctamente.',
+                ],
+            ];
+        }
+
+        if (preg_match('/^\\/start(?:@\\w+)?\\s+(\\d+)$/', $textoTelegram, $coincidencias) !== 1) {
+            return [422, ['error' => 'El comando /start no contiene un id de usuario valido.']];
+        }
+
+        if ($chatIdTelegram === '') {
+            return [422, ['error' => 'No se ha recibido chat_id de Telegram.']];
+        }
+
+        $idUsuarioTelegram = (int) ($coincidencias[1] ?? 0);
+        return $this->guardarVinculacionTelegram($idUsuarioTelegram, $chatIdTelegram, $nombreGuardable, 'comando_start', [
+            'telegram_usuario_recibido' => $usuarioTelegram !== '',
+            'first_name_recibido' => $firstNameTelegram !== '',
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $contextoLog
+     * @return array{0: int, 1: array<string, mixed>}
+     */
+    private function guardarVinculacionTelegram(
+        int $idUsuario,
+        string $telegramChatId,
+        ?string $telegramUsuario,
+        string $origen,
+        array $contextoLog = []
+    ): array {
         $usuario = $this->repositorioUsuarios->obtenerPorId($idUsuario);
         if ($usuario === null) {
             return [404, ['error' => 'No existe usuario para vincular Telegram.']];
@@ -159,7 +190,8 @@ final class ControladorTelegram
         $this->logger->info('Cuenta Telegram vinculada', [
             'id_usuario' => $idUsuario,
             'telegram_chat_id' => $telegramChatId,
-        ]);
+            'origen' => $origen,
+        ] + $contextoLog);
 
         return [
             200,
@@ -172,6 +204,106 @@ final class ControladorTelegram
                 ],
             ],
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $datos
+     */
+    private function obtenerTextoTelegram(array $datos): string
+    {
+        return $this->obtenerTextoFlexible($datos, [
+            'text',
+            'message.text',
+            'callback_query.message.text',
+            'body.text',
+            'body.message.text',
+            'body.callback_query.message.text',
+            'json.text',
+            'json.message.text',
+            'json.callback_query.message.text',
+            'data.text',
+            'data.message.text',
+            'data.callback_query.message.text',
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $datos
+     */
+    private function obtenerChatIdTelegram(array $datos): string
+    {
+        return $this->obtenerTextoFlexible($datos, [
+            'telegram_chat_id',
+            'chat_id',
+            'message.chat.id',
+            'callback_query.message.chat.id',
+            'body.telegram_chat_id',
+            'body.chat_id',
+            'body.message.chat.id',
+            'body.callback_query.message.chat.id',
+            'json.telegram_chat_id',
+            'json.chat_id',
+            'json.message.chat.id',
+            'json.callback_query.message.chat.id',
+            'data.telegram_chat_id',
+            'data.chat_id',
+            'data.message.chat.id',
+            'data.callback_query.message.chat.id',
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $datos
+     */
+    private function obtenerUsuarioTelegram(array $datos): string
+    {
+        return $this->obtenerTextoFlexible($datos, [
+            'telegram_usuario',
+            'username',
+            'message.from.username',
+            'message.chat.username',
+            'callback_query.from.username',
+            'body.telegram_usuario',
+            'body.username',
+            'body.message.from.username',
+            'body.message.chat.username',
+            'body.callback_query.from.username',
+            'json.telegram_usuario',
+            'json.username',
+            'json.message.from.username',
+            'json.message.chat.username',
+            'json.callback_query.from.username',
+            'data.telegram_usuario',
+            'data.username',
+            'data.message.from.username',
+            'data.message.chat.username',
+            'data.callback_query.from.username',
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $datos
+     */
+    private function obtenerFirstNameTelegram(array $datos): string
+    {
+        return $this->obtenerTextoFlexible($datos, [
+            'first_name',
+            'message.from.first_name',
+            'message.chat.first_name',
+            'callback_query.from.first_name',
+            'body.first_name',
+            'body.message.from.first_name',
+            'body.message.chat.first_name',
+            'body.callback_query.from.first_name',
+            'json.first_name',
+            'json.message.from.first_name',
+            'json.message.chat.first_name',
+            'json.callback_query.from.first_name',
+            'data.first_name',
+            'data.message.from.first_name',
+            'data.message.chat.first_name',
+            'data.callback_query.from.first_name',
+        ]);
     }
 
     /**
