@@ -137,7 +137,7 @@ $controladorCatalogoLibros = new ControladorCatalogoLibros($servicioCatalogoLibr
 $controladorTelegram = new ControladorTelegram(
     $repositorioUsuarios,
     $logger,
-    (string) ($_ENV['TELEGRAM_VINCULACION_TOKEN'] ?? '')
+    (string) ($_ENV['TELEGRAM_WEBHOOK_SECRET'] ?? $_ENV['TELEGRAM_VINCULACION_TOKEN'] ?? '')
 );
 $controladorPrestamos = new ControladorPrestamos(
     $repositorioPrestamos,

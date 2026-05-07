@@ -69,6 +69,8 @@ DB_PASS=
 
 N8N_WEBHOOK_PRESTAMO=
 TELEGRAM_BOT_URL_BASE=
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_WEBHOOK_SECRET=
 TELEGRAM_VINCULACION_TOKEN=
 GOOGLE_BOOKS_API_KEY=
 
@@ -236,7 +238,29 @@ Webhook recomendado para Telegram:
 https://TU_DOMINIO/api/telegram/webhook
 ```
 
-Al configurar el webhook de Telegram, usa como `secret_token` el mismo valor que `TELEGRAM_VINCULACION_TOKEN`. Telegram lo enviara como cabecera `X-Telegram-Bot-Api-Secret-Token`.
+Configura en `.env`:
+
+```dotenv
+TELEGRAM_BOT_TOKEN=token_real_del_bot
+TELEGRAM_WEBHOOK_SECRET=secreto_sin_dos_puntos_ni_espacios
+TELEGRAM_BOT_URL_BASE=https://t.me/Fabularia_bot?start=
+```
+
+No uses el token real del bot como `TELEGRAM_WEBHOOK_SECRET`. El secret debe usar solo letras, numeros, guion y guion bajo.
+
+Para configurar el webhook desde el VPS:
+
+```bash
+php /www/proyectos/fabularia/scripts/configurar_webhook_telegram.php
+```
+
+El script usa `APP_URL_BASE/api/telegram/webhook`. Si quieres pasar la URL manualmente:
+
+```bash
+php /www/proyectos/fabularia/scripts/configurar_webhook_telegram.php https://TU_DOMINIO/api/telegram/webhook
+```
+
+Telegram enviara `TELEGRAM_WEBHOOK_SECRET` como cabecera `X-Telegram-Bot-Api-Secret-Token`.
 
 Payload esperado desde Telegram:
 
@@ -256,7 +280,7 @@ Payload esperado desde Telegram:
 ```
 
 Tambien se mantiene `/api/telegram/vincular` para pruebas manuales o compatibilidad, pero la vinculacion real debe apuntar a `/api/telegram/webhook`.
-`TELEGRAM_VINCULACION_TOKEN` no debe publicarse ni subirse a Git; debe coincidir exactamente entre `.env` y el `secret_token` configurado en Telegram.
+`TELEGRAM_BOT_TOKEN` y `TELEGRAM_WEBHOOK_SECRET` no deben publicarse ni subirse a Git.
 
 ## Notas de seguridad y buenas practicas
 

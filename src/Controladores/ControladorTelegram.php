@@ -14,7 +14,7 @@ final class ControladorTelegram
     public function __construct(
         private readonly RepositorioUsuarios $repositorioUsuarios,
         private readonly Logger $logger,
-        private readonly string $tokenVinculacion
+        private readonly string $secretoWebhook
     ) {
     }
 
@@ -52,12 +52,12 @@ final class ControladorTelegram
             ]);
         }
 
-        if (trim($this->tokenVinculacion) === '') {
+        if (trim($this->secretoWebhook) === '') {
             $this->logger->warning('No se pudo vincular Telegram: token no configurado.');
             return [500, ['error' => 'Token de vinculacion Telegram no configurado en el servidor.']];
         }
 
-        if (!hash_equals($this->tokenVinculacion, $tokenRecibido)) {
+        if (!hash_equals($this->secretoWebhook, $tokenRecibido)) {
             $this->logger->warning('No se pudo vincular Telegram: token invalido o ausente.', [
                 'token_recibido' => $tokenRecibido !== '',
                 'claves_recibidas' => implode(',', array_slice(array_keys($datos), 0, 12)),
@@ -395,7 +395,7 @@ final class ControladorTelegram
     }
 
     /**
-     * n8n puede entregar el update plano o envolverlo en body/json/data. Si el envoltorio llega
+     * Algunos proxies o pruebas pueden entregar el update plano o envolverlo en body/json/data. Si el envoltorio llega
      * como string JSON, lo decodificamos para poder leer rutas como body.message.chat.id.
      *
      * @param array<string, mixed> $datos
