@@ -394,6 +394,11 @@ button:hover {
     max-width: 420px;
 }
 
+.mensaje-detalle {
+    margin: 0.7rem 0 0;
+    width: 100%;
+}
+
 .acceso-usuario {
     display: inline-flex;
     align-items: center;

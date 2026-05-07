@@ -262,6 +262,7 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
                     <label for="fechaDevolucionSolicitud">Fecha de devolución (máximo 14 días)</label>
                     <input id="fechaDevolucionSolicitud" type="date">
                 </div>
+                <p id="detalleLibroMensaje" class="mensaje mensaje-detalle" aria-live="polite"></p>
                 <div class="detalle-libro-acciones">
                     <button id="botonSolicitarDetalle" type="button">Solicitar préstamo</button>
                 </div>
@@ -342,6 +343,7 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
     const detalleLibroDescripcion = document.getElementById("detalleLibroDescripcion");
     const bloqueFechaDevolucionSolicitud = document.getElementById("bloqueFechaDevolucionSolicitud");
     const fechaDevolucionSolicitud = document.getElementById("fechaDevolucionSolicitud");
+    const detalleLibroMensaje = document.getElementById("detalleLibroMensaje");
     const botonSolicitarDetalle = document.getElementById("botonSolicitarDetalle");
     const modalLectorLibro = document.getElementById("modalLectorLibro");
     const cerrarLectorLibro = document.getElementById("cerrarLectorLibro");
@@ -433,6 +435,25 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
 
         mensaje.className = "mensaje";
         mensaje.textContent = "";
+    }
+
+    function mostrarMensajeDetalleLibro(texto, tipo = "error") {
+        detalleLibroMensaje.className = `mensaje mensaje-detalle ${tipo}`;
+        detalleLibroMensaje.textContent = texto;
+    }
+
+    function limpiarMensajeDetalleLibro() {
+        detalleLibroMensaje.className = "mensaje mensaje-detalle";
+        detalleLibroMensaje.textContent = "";
+    }
+
+    function normalizarMensajeErrorPrestamo(mensajeError) {
+        const texto = String(mensajeError || "");
+        if (texto.toLowerCase().includes("al menos un libro propio")) {
+            return "Para solicitar un pr\u00e9stamo debes publicar primero al menos un libro propio disponible para intercambio.";
+        }
+
+        return texto || "No se pudo completar la solicitud de pr\u00e9stamo.";
     }
 
     function mostrarAvisoCapturaIlegal() {
@@ -1172,6 +1193,7 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         detalleLibroPropietario.textContent = `Propietario: ${libro.propietario || "No disponible"}`;
         const descripcion = soloDescripcionEspanol(libro.descripcion || "");
         detalleLibroDescripcion.textContent = descripcion || "Sin descripcion disponible.";
+        limpiarMensajeDetalleLibro();
         botonSolicitarDetalle.hidden = false;
         botonSolicitarDetalle.textContent = "Solicitar préstamo";
         botonSolicitarDetalle.dataset.modo = "catalogo";
@@ -1201,6 +1223,7 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         detalleLibroPropietario.textContent = "Catálogo gratuito (sin préstamo entre usuarios).";
         const descripcion = limpiarDescripcionCatalogoLibre(libro.descripcion || "", idioma);
         detalleLibroDescripcion.textContent = descripcion || "Sin descripcion disponible.";
+        limpiarMensajeDetalleLibro();
         botonSolicitarDetalle.hidden = false;
         botonSolicitarDetalle.textContent = "Leer gratis";
         botonSolicitarDetalle.dataset.modo = "catalogo-libre";
@@ -1228,6 +1251,7 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         detalleLibroPropietario.textContent = `Propietario: ${prestamo.nombre_dueno || "No disponible"} | Prestado: ${prestamo.fecha_prestamo || "-"}${fechaLimite}`;
         const descripcion = soloDescripcionEspanol(prestamo.descripcion || "");
         detalleLibroDescripcion.textContent = descripcion || "Sin descripcion disponible.";
+        limpiarMensajeDetalleLibro();
         botonSolicitarDetalle.dataset.modo = "prestamo";
         botonSolicitarDetalle.dataset.idLibro = "";
         botonSolicitarDetalle.dataset.idPrestamo = String(prestamo.id);
@@ -1253,6 +1277,7 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         botonSolicitarDetalle.dataset.idExterno = "";
         bloqueFechaDevolucionSolicitud.hidden = true;
         fechaDevolucionSolicitud.value = "";
+        limpiarMensajeDetalleLibro();
     }
 
     async function solicitarPrestamoDesdeCatalogo(idLibro, fechaLimiteDevolucion = "") {
@@ -2092,6 +2117,7 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
         const idExterno = String(botonSolicitarDetalle.dataset.idExterno || "");
 
         limpiarMensaje();
+        limpiarMensajeDetalleLibro();
         try {
             if (modo === "prestamo") {
                 if (Number.isNaN(idPrestamo) || idPrestamo <= 0) {
@@ -2127,7 +2153,11 @@ $urlLogin = ($basePublica === '' ? '' : $basePublica) . '/login';
             cerrarFichaLibro();
             mostrarMensaje("Préstamo solicitado correctamente.", "ok");
         } catch (error) {
-            mostrarMensaje(error.message, "error");
+            if (modo === "catalogo") {
+                mostrarMensajeDetalleLibro(normalizarMensajeErrorPrestamo(error.message), "error");
+            } else {
+                mostrarMensaje(error.message, "error");
+            }
         }
     });
 
