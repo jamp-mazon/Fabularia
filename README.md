@@ -160,6 +160,7 @@ SOURCE database/migracion_lectura_publica_prestamos.sql;
 SOURCE database/migracion_archivos_libros.sql;
 SOURCE database/migracion_restablecimiento_contrasena.sql;
 SOURCE database/migracion_fecha_limite_prestamos.sql;
+SOURCE database/migracion_normalizar_telefonos.sql;
 ```
 
 ## Ejecucion local

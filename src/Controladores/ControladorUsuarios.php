@@ -28,8 +28,7 @@ final class ControladorUsuarios
         $datos = SolicitudHttp::obtenerDatosEntrada();
         $nombre = SolicitudHttp::obtenerTexto($datos, 'nombre');
         $apellidos = SolicitudHttp::obtenerTexto($datos, 'apellidos');
-        $telefono = SolicitudHttp::obtenerTexto($datos, 'telefono');
-        $telefono = $telefono === '' ? null : $telefono;
+        $telefono = $this->normalizarTelefono(SolicitudHttp::obtenerTexto($datos, 'telefono'));
         $email = mb_strtolower(SolicitudHttp::obtenerTexto($datos, 'email'));
         $contrasena = SolicitudHttp::obtenerTexto($datos, 'contrasena');
         $confirmarContrasena = SolicitudHttp::obtenerTexto($datos, 'confirmar_contrasena');
@@ -351,8 +350,7 @@ final class ControladorUsuarios
         }
 
         $datos = SolicitudHttp::obtenerDatosEntrada();
-        $telefono = SolicitudHttp::obtenerTexto($datos, 'telefono');
-        $telefono = $telefono === '' ? null : $telefono;
+        $telefono = $this->normalizarTelefono(SolicitudHttp::obtenerTexto($datos, 'telefono'));
 
         if ($telefono !== null && !$this->telefonoValido($telefono)) {
             return [422, ['error' => 'El teléfono no tiene un formato válido.']];
@@ -435,7 +433,23 @@ final class ControladorUsuarios
 
     private function telefonoValido(string $telefono): bool
     {
-        return preg_match('/^[0-9+()\\-\\s]{6,30}$/', $telefono) === 1;
+        return preg_match('/^\\+?[0-9]{6,20}$/', $telefono) === 1;
+    }
+
+    private function normalizarTelefono(string $telefono): ?string
+    {
+        $telefono = trim($telefono);
+        if ($telefono === '') {
+            return null;
+        }
+
+        $tienePrefijoInternacional = str_starts_with($telefono, '+');
+        $soloNumeros = preg_replace('/\\D+/', '', $telefono) ?? '';
+        if ($soloNumeros === '') {
+            return '';
+        }
+
+        return $tienePrefijoInternacional ? '+' . $soloNumeros : $soloNumeros;
     }
 
     private function construirHtmlCorreoRestablecimiento(string $nombre, string $enlace, int $minutos): string
