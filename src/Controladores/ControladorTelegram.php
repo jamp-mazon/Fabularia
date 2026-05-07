@@ -19,7 +19,9 @@ final class ControladorTelegram
     }
 
     /**
-     * Endpoint para que n8n registre el chat_id de Telegram tras recibir /start USUARIO_ID.
+     * Webhook directo de Telegram para registrar el chat_id tras recibir /start USUARIO_ID.
+     * n8n no interviene en esta vinculacion; n8n solo recibe datos despues para notificaciones.
+     *
      * @return array{0: int, 1: array<string, mixed>}
      */
     public function vincularCuenta(): array
@@ -28,6 +30,7 @@ final class ControladorTelegram
         $tokenRecibido = trim((string) (
             $_SERVER['HTTP_X_VINCULACION_TOKEN']
             ?? $_SERVER['HTTP_X_TELEGRAM_VINCULACION_TOKEN']
+            ?? $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN']
             ?? $_GET['token_vinculacion']
             ?? $_GET['token']
             ?? ''
@@ -67,6 +70,10 @@ final class ControladorTelegram
             return $respuestaStart;
         }
 
+        if ($this->esMensajeTelegramIgnorable($datos)) {
+            return [200, ['mensaje' => 'Mensaje de Telegram ignorado.']];
+        }
+
         $idUsuario = $this->obtenerEnteroFlexible($datos, [
             'usuario_id',
             'id_usuario',
@@ -98,7 +105,22 @@ final class ControladorTelegram
             return [422, ['error' => 'usuario_id y telegram_chat_id son obligatorios.']];
         }
 
-        return $this->guardarVinculacionTelegram($idUsuario, $telegramChatId, $telegramUsuario, 'payload_n8n');
+        return $this->guardarVinculacionTelegram($idUsuario, $telegramChatId, $telegramUsuario, 'payload_directo');
+    }
+
+    /**
+     * Telegram puede enviar cualquier mensaje al webhook. Solo /start ID_USUARIO vincula.
+     *
+     * @param array<string, mixed> $datos
+     */
+    private function esMensajeTelegramIgnorable(array $datos): bool
+    {
+        $textoTelegram = $this->obtenerTextoTelegram($datos);
+        if ($textoTelegram === '') {
+            return false;
+        }
+
+        return preg_match('/^\\/start(?:@\\w+)?(?:\\s|$)/', $textoTelegram) !== 1;
     }
 
     /**

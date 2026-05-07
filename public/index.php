@@ -212,6 +212,7 @@ $enrutador->registrar('POST', '/api/usuarios/cuenta/eliminar', static fn () => $
 $enrutador->registrar('GET', '/api/catalogo/sugerencias', static fn () => $controladorCatalogoLibros->sugerencias(), true);
 $enrutador->registrar('GET', '/api/catalogo/libre', static fn () => $controladorCatalogoLibros->catalogoLibre(), true);
 $enrutador->registrar('GET', '/api/catalogo/libre/lectura', static fn () => $controladorCatalogoLibros->leerCatalogoLibre(), true);
+$enrutador->registrar('POST', '/api/telegram/webhook', static fn () => $controladorTelegram->vincularCuenta());
 $enrutador->registrar('POST', '/api/telegram/vincular', static fn () => $controladorTelegram->vincularCuenta());
 
 $enrutador->registrar('POST', '/api/libros', static fn () => $controladorLibros->publicarLibro(), true);

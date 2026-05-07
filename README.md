@@ -222,27 +222,41 @@ Prestamos:
 - `POST /api/prestamos/lectura/progreso`
 - `POST /api/prestamos/devolver`
 
-## Integracion Telegram + n8n
+## Integracion Telegram
 
 - El usuario abre el bot con `TELEGRAM_BOT_URL_BASE + USUARIO_ID`.
-- n8n captura `chat_id`/`username` y llama a `/api/telegram/vincular`.
-- Al crear un prestamo, Fabularia envia webhook a n8n con datos de libro,
-  usuario propietario, usuario receptor y fecha limite.
+- Telegram llama directamente a `/api/telegram/webhook`.
+- Fabularia lee `/start USUARIO_ID`, `message.chat.id`, `message.from.username` y guarda la vinculacion en `usuarios`.
+- Al crear un prestamo, Fabularia envia webhook a n8n con datos de libro, usuario propietario, usuario receptor y fecha limite.
+- n8n se usa para enviar mensajes de Telegram cuando hay prestamos, no para vincular usuarios.
 
-Payload plano recomendado desde n8n:
+Webhook recomendado para Telegram:
+
+```text
+https://TU_DOMINIO/api/telegram/webhook
+```
+
+Al configurar el webhook de Telegram, usa como `secret_token` el mismo valor que `TELEGRAM_VINCULACION_TOKEN`. Telegram lo enviara como cabecera `X-Telegram-Bot-Api-Secret-Token`.
+
+Payload esperado desde Telegram:
 
 ```json
 {
-  "usuario_id": 1,
-  "telegram_chat_id": "123456789",
-  "telegram_usuario": "usuario_telegram",
-  "token_vinculacion": "mismo_valor_que_TELEGRAM_VINCULACION_TOKEN"
+  "message": {
+    "text": "/start 1",
+    "chat": {
+      "id": 123456789
+    },
+    "from": {
+      "username": "usuario_telegram",
+      "first_name": "Usuario"
+    }
+  }
 }
 ```
 
-Tambien se acepta un update de Telegram con `message.chat.id`, `message.from.username` y texto `/start USUARIO_ID`.
-Si n8n envuelve el contenido en `body`, `json` o `data`, el backend tambien intenta leerlo desde ahi.
-`TELEGRAM_VINCULACION_TOKEN` no debe publicarse ni subirse a Git; debe coincidir exactamente entre `.env` y n8n.
+Tambien se mantiene `/api/telegram/vincular` para pruebas manuales o compatibilidad, pero la vinculacion real debe apuntar a `/api/telegram/webhook`.
+`TELEGRAM_VINCULACION_TOKEN` no debe publicarse ni subirse a Git; debe coincidir exactamente entre `.env` y el `secret_token` configurado en Telegram.
 
 ## Notas de seguridad y buenas practicas
 
