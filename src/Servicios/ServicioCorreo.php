@@ -87,7 +87,7 @@ final class ServicioCorreo
     }
 
     private function debeUsarSmtp(): bool
-     {
+    {
         if ($this->driver === 'smtp') {
             return true;
         }
@@ -155,6 +155,17 @@ final class ServicioCorreo
             return false;
         }
 
+        if ($this->smtpAuth && ($this->smtpUser === '' || $this->smtpPass === '')) {
+            $this->logger->warning('No se pudo enviar correo SMTP: credenciales incompletas.', [
+                'destinatario' => $destinatarioEmail,
+                'asunto' => $asunto,
+                'smtp_host' => $this->smtpHost,
+                'smtp_port' => $this->smtpPort,
+                'remitente' => $remitenteEmail,
+            ]);
+            return false;
+        }
+
         $mail = new PHPMailer(true);
         try {
             $mail->CharSet = 'UTF-8';
@@ -165,6 +176,7 @@ final class ServicioCorreo
             $mail->Username = $this->smtpUser;
             $mail->Password = $this->smtpPass;
             $mail->Timeout = $this->smtpTimeout;
+            $mail->addReplyTo($remitenteEmail, $nombre);
 
             if (in_array($this->smtpEncryption, ['tls', 'ssl'], true)) {
                 $mail->SMTPSecure = $this->smtpEncryption;
@@ -183,9 +195,13 @@ final class ServicioCorreo
                 'destinatario' => $destinatarioEmail,
                 'asunto' => $asunto,
                 'mensaje' => $excepcion->getMessage(),
+                'error_info' => $mail->ErrorInfo,
+                'smtp_host' => $this->smtpHost,
+                'smtp_port' => $this->smtpPort,
+                'smtp_encryption' => $this->smtpEncryption,
+                'remitente' => $remitenteEmail,
             ]);
             return false;
         }
     }
 }
-

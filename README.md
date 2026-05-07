@@ -108,6 +108,39 @@ Cron recomendado cada 15 minutos:
 */15 * * * * /usr/bin/php /www/proyectos/fabularia/scripts/precalentar_catalogo_libre.php 3 10 >/dev/null 2>&1
 ```
 
+## Diagnostico de correo en VPS
+
+La recuperacion de contrasena usa `MAIL_DRIVER=smtp`. En hosting/VPS no conviene depender de `mail()` porque puede fallar sin dar mucho detalle o acabar bloqueado por el proveedor.
+
+Configuracion minima esperada en `.env`:
+
+```dotenv
+MAIL_DRIVER=smtp
+MAIL_FROM_EMAIL=correo_verificado_en_el_proveedor
+MAIL_FROM_NAME=Fabularia
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+SMTP_USER=usuario_smtp
+SMTP_PASS=contrasena_smtp
+SMTP_ENCRYPTION=tls
+SMTP_AUTH=true
+SMTP_TIMEOUT=20
+```
+
+Para probar el envio sin depender de la base de datos:
+
+```bash
+php /www/proyectos/fabularia/scripts/probar_correo.php destino@ejemplo.com
+```
+
+Si falla, revisar `logs/app.log`. El log muestra host, puerto, cifrado y remitente, pero no muestra la contrasena SMTP.
+
+Notas:
+
+- `MAIL_FROM_EMAIL` debe ser un remitente o dominio verificado en el proveedor SMTP.
+- Si el email no existe en la base de datos, la aplicacion devuelve el mismo mensaje generico por seguridad y no envia correo.
+- Si el proveedor acepta el envio pero no llega, revisar spam y el panel de actividad del proveedor SMTP.
+
 ## Base de datos
 
 Aplicar esquema completo:

@@ -274,6 +274,12 @@ final class ControladorUsuarios
             }
         }
 
+        if ($usuario === null) {
+            $this->logger->info('Solicitud de restablecimiento para email no registrado', [
+                'email' => $email,
+            ]);
+        }
+
         return [200, ['mensaje' => 'Si el email existe, recibirás instrucciones para restablecer la contraseña.']];
     }
 
