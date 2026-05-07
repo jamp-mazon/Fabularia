@@ -65,7 +65,7 @@ final class ControladorTelegram
             return [401, ['error' => 'Token de vinculacion invalido.']];
         }
 
-        $respuestaStart = $this->vincularDesdeComandoStart($datos);
+        $respuestaStart = $this->vincularDesdeUpdateTelegram($datos);
         if ($respuestaStart !== null) {
             return $respuestaStart;
         }
@@ -124,26 +124,39 @@ final class ControladorTelegram
     }
 
     /**
+     * Mapeo directo del update de Telegram:
+     * message.text -> "/start ID_USUARIO"
+     * message.chat.id -> chat_id que se guarda en usuarios.telegram_chat_id
+     * message.from.username|first_name -> usuarios.telegram_usuario
+     *
      * @param array<string, mixed> $datos
      * @return array{0: int, 1: array<string, mixed>}|null
      */
-    private function vincularDesdeComandoStart(array $datos): ?array
+    private function vincularDesdeUpdateTelegram(array $datos): ?array
     {
-        $textoTelegram = $this->obtenerTextoTelegram($datos);
+        $mensaje = $datos['message'] ?? null;
+        if (!is_array($mensaje)) {
+            return null;
+        }
+
+        $textoTelegram = trim((string) ($mensaje['text'] ?? ''));
         if ($textoTelegram === '') {
             return null;
         }
 
-        if (preg_match('/^\\/start(?:@\\w+)?(?:\\s|$)/', $textoTelegram) !== 1) {
+        if (!str_starts_with($textoTelegram, '/start')) {
             return null;
         }
 
-        $chatIdTelegram = $this->obtenerChatIdTelegram($datos);
-        $usuarioTelegram = $this->obtenerUsuarioTelegram($datos);
-        $firstNameTelegram = $this->obtenerFirstNameTelegram($datos);
+        $chat = $mensaje['chat'] ?? [];
+        $from = $mensaje['from'] ?? [];
+        $chatIdTelegram = is_array($chat) ? trim((string) ($chat['id'] ?? '')) : '';
+        $usuarioTelegram = is_array($from) ? trim((string) ($from['username'] ?? '')) : '';
+        $firstNameTelegram = is_array($from) ? trim((string) ($from['first_name'] ?? '')) : '';
         $nombreGuardable = $usuarioTelegram !== '' ? $usuarioTelegram : ($firstNameTelegram !== '' ? $firstNameTelegram : null);
 
-        if (preg_match('/^\\/start(?:@\\w+)?$/', $textoTelegram) === 1) {
+        $partes = preg_split('/\\s+/', $textoTelegram) ?: [];
+        if (count($partes) <= 1) {
             $this->logger->warning('Telegram /start recibido sin id de usuario Fabularia.', [
                 'telegram_chat_id_recibido' => $chatIdTelegram !== '',
                 'telegram_usuario_recibido' => $usuarioTelegram !== '',
@@ -158,7 +171,8 @@ final class ControladorTelegram
             ];
         }
 
-        if (preg_match('/^\\/start(?:@\\w+)?\\s+(\\d+)$/', $textoTelegram, $coincidencias) !== 1) {
+        $vinculoId = trim((string) ($partes[1] ?? ''));
+        if ($vinculoId === '' || ctype_digit($vinculoId) === false) {
             return [422, ['error' => 'El comando /start no contiene un id de usuario valido.']];
         }
 
@@ -166,7 +180,7 @@ final class ControladorTelegram
             return [422, ['error' => 'No se ha recibido chat_id de Telegram.']];
         }
 
-        $idUsuarioTelegram = (int) ($coincidencias[1] ?? 0);
+        $idUsuarioTelegram = (int) $vinculoId;
         return $this->guardarVinculacionTelegram($idUsuarioTelegram, $chatIdTelegram, $nombreGuardable, 'comando_start', [
             'telegram_usuario_recibido' => $usuarioTelegram !== '',
             'first_name_recibido' => $firstNameTelegram !== '',

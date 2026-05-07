@@ -228,7 +228,7 @@ Prestamos:
 
 - El usuario abre el bot con `TELEGRAM_BOT_URL_BASE + USUARIO_ID`.
 - Telegram llama directamente a `/api/telegram/webhook`.
-- Fabularia lee `/start USUARIO_ID`, `message.chat.id`, `message.from.username` y guarda la vinculacion en `usuarios`.
+- Fabularia lee directamente `message.text`, `message.chat.id`, `message.from.username` y guarda la vinculacion en `usuarios`.
 - Al crear un prestamo, Fabularia envia webhook a n8n con datos de libro, usuario propietario, usuario receptor y fecha limite.
 - n8n se usa para enviar mensajes de Telegram cuando hay prestamos, no para vincular usuarios.
 
