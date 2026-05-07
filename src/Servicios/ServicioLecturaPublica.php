@@ -696,12 +696,36 @@ final class ServicioLecturaPublica
         $pagina = max(1, $pagina);
         $porPagina = max(1, $porPagina);
 
-        $filtrados = $this->filtrarCatalogoLibreFallbackPorIdioma(
+        $filtrados = $this->cargarReferenciasCatalogoLibreDesdeCache(
+            $textoBusqueda,
+            $idioma,
+            $filtroGenero
+        );
+
+        $idsVistos = [];
+        foreach ($filtrados as $libroCacheado) {
+            $idExterno = trim((string) ($libroCacheado['id_externo'] ?? ''));
+            if ($idExterno !== '') {
+                $idsVistos[$idExterno] = true;
+            }
+        }
+
+        $fallbackEstatico = $this->filtrarCatalogoLibreFallbackPorIdioma(
             $textoBusqueda,
             $idioma,
             500,
             $filtroGenero
         );
+
+        foreach ($fallbackEstatico as $libroFallback) {
+            $idExterno = trim((string) ($libroFallback['id_externo'] ?? ''));
+            if ($idExterno === '' || isset($idsVistos[$idExterno])) {
+                continue;
+            }
+
+            $idsVistos[$idExterno] = true;
+            $filtrados[] = $libroFallback;
+        }
 
         $offset = ($pagina - 1) * $porPagina;
         $libros = array_slice($filtrados, $offset, $porPagina);
@@ -711,6 +735,73 @@ final class ServicioLecturaPublica
             'libros' => $libros,
             'hay_siguiente' => $haySiguiente,
         ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function cargarReferenciasCatalogoLibreDesdeCache(
+        string $textoBusqueda,
+        string $idioma,
+        string $filtroGenero = ''
+    ): array {
+        try {
+            $this->asegurarDirectorioCache();
+            $patron = $this->directorioCacheLecturas . DIRECTORY_SEPARATOR . 'catalogo-libre-*.json';
+            $rutas = glob($patron) ?: [];
+        } catch (\Throwable) {
+            return [];
+        }
+
+        $textoNormalizado = $this->normalizarTexto($textoBusqueda);
+        $idioma = trim(mb_strtolower($idioma, 'UTF-8'));
+        $filtroGenero = $this->normalizarTexto($filtroGenero);
+        $salida = [];
+        $idsVistos = [];
+
+        foreach ($rutas as $ruta) {
+            try {
+                $contenido = (string) file_get_contents($ruta);
+                $datos = json_decode($contenido, true);
+                if (!is_array($datos)) {
+                    continue;
+                }
+
+                $libro = $this->normalizarReferenciaCacheCatalogoLibre($datos);
+                if (trim(mb_strtolower((string) ($libro['idioma'] ?? ''), 'UTF-8')) !== $idioma) {
+                    continue;
+                }
+
+                if (!$this->coincideGeneroCatalogoLibre($libro, $filtroGenero)) {
+                    continue;
+                }
+
+                $buscable = $this->normalizarTexto(
+                    (string) ($libro['titulo'] ?? '') . ' ' .
+                    (string) ($libro['autor'] ?? '') . ' ' .
+                    (string) ($libro['descripcion'] ?? '')
+                );
+                if ($textoNormalizado !== '' && !str_contains($buscable, $textoNormalizado)) {
+                    continue;
+                }
+
+                $idExterno = trim((string) ($libro['id_externo'] ?? ''));
+                if ($idExterno === '' || isset($idsVistos[$idExterno])) {
+                    continue;
+                }
+
+                $idsVistos[$idExterno] = true;
+                $salida[] = $libro;
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        usort($salida, static function (array $a, array $b): int {
+            return strnatcasecmp((string) ($a['titulo'] ?? ''), (string) ($b['titulo'] ?? ''));
+        });
+
+        return $salida;
     }
 
     /**
@@ -1864,10 +1955,26 @@ final class ServicioLecturaPublica
             curl_close($curl);
 
             if ($respuesta === false) {
+                $cacheCaducada = $this->cargarJsonDesdeCache($url, 0);
+                if ($cacheCaducada !== null) {
+                    $this->logger->warning('Se usa cache JSON caducada por fallo cURL en Gutendex', [
+                        'mensaje' => $error,
+                    ]);
+                    return $cacheCaducada;
+                }
+
                 throw new RuntimeException('Fallo cURL: ' . $error);
             }
 
             if ($codigo < 200 || $codigo >= 300) {
+                $cacheCaducada = $this->cargarJsonDesdeCache($url, 0);
+                if ($cacheCaducada !== null) {
+                    $this->logger->warning('Se usa cache JSON caducada por respuesta HTTP de Gutendex', [
+                        'http' => $codigo,
+                    ]);
+                    return $cacheCaducada;
+                }
+
                 throw new RuntimeException('La API publica devolvio HTTP ' . $codigo);
             }
         } else {
@@ -1882,6 +1989,12 @@ final class ServicioLecturaPublica
 
             $respuesta = @file_get_contents($url, false, $contexto);
             if ($respuesta === false) {
+                $cacheCaducada = $this->cargarJsonDesdeCache($url, 0);
+                if ($cacheCaducada !== null) {
+                    $this->logger->warning('Se usa cache JSON caducada por fallo de lectura en Gutendex');
+                    return $cacheCaducada;
+                }
+
                 throw new RuntimeException('No se pudo obtener respuesta JSON de API publica.');
             }
         }
@@ -1908,7 +2021,11 @@ final class ServicioLecturaPublica
             }
 
             $modificacion = (int) (@filemtime($ruta) ?: 0);
-            if ($modificacion <= 0 || (time() - $modificacion) > $ttlSegundos) {
+            if ($modificacion <= 0) {
+                return null;
+            }
+
+            if ($ttlSegundos > 0 && (time() - $modificacion) > $ttlSegundos) {
                 return null;
             }
 

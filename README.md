@@ -108,6 +108,9 @@ Cron recomendado cada 15 minutos:
 */15 * * * * /usr/bin/php /www/proyectos/fabularia/scripts/precalentar_catalogo_libre.php 3 10 >/dev/null 2>&1
 ```
 
+Si Gutendex falla o responde lento, la aplicacion intenta mostrar los libros ya guardados en `LECTURA_CACHE_DIR`.
+Comprueba que esa carpeta exista y sea escribible por PHP.
+
 ## Diagnostico de correo en VPS
 
 La recuperacion de contrasena usa `MAIL_DRIVER=smtp`. En hosting/VPS no conviene depender de `mail()` porque puede fallar sin dar mucho detalle o acabar bloqueado por el proveedor.
@@ -225,6 +228,20 @@ Prestamos:
 - n8n captura `chat_id`/`username` y llama a `/api/telegram/vincular`.
 - Al crear un prestamo, Fabularia envia webhook a n8n con datos de libro,
   usuario propietario, usuario receptor y fecha limite.
+
+Payload plano recomendado desde n8n:
+
+```json
+{
+  "usuario_id": 1,
+  "telegram_chat_id": "123456789",
+  "telegram_usuario": "usuario_telegram",
+  "token_vinculacion": "mismo_valor_que_TELEGRAM_VINCULACION_TOKEN"
+}
+```
+
+Tambien se acepta un update de Telegram con `message.chat.id`, `message.from.username` y texto `/start USUARIO_ID`.
+`TELEGRAM_VINCULACION_TOKEN` no debe publicarse ni subirse a Git; debe coincidir exactamente entre `.env` y n8n.
 
 ## Notas de seguridad y buenas practicas
 
