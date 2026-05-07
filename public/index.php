@@ -103,7 +103,7 @@ $servicioCatalogoLibros = new ServicioCatalogoLibros(
 );
 $servicioWebhookPrestamos = new ServicioWebhookPrestamos(
     $logger,
-    (string) ($_ENV['N8N_WEBHOOK_PRESTAMO'] ?? 'https://n8n.example/webhook-test/REDACTED')
+    (string) ($_ENV['N8N_WEBHOOK_PRESTAMO'] ?? '')
 );
 $servicioCorreo = new ServicioCorreo(
     $logger,
